@@ -29,7 +29,9 @@ for (const id of ids) {
     need(s.title && s.situation, `${at}: title 또는 situation 없음`);
     need(s.theory?.length, `${at}: 이론 없음`);
     for (const b of s.theory ?? []) need(blocks.includes(b.t), `${at}: 알 수 없는 이론 블록 ${b.t}`);
-    need(s.quiz?.length, `${at}: 문제 없음`);
+    need((s.quiz?.length ?? 0) >= 30, `${at}: 문제가 30개보다 적음 (${s.quiz?.length ?? 0}개)`);
+    const questions = (s.quiz ?? []).map(q => q.q);
+    need(new Set(questions).size === questions.length, `${at}: 질문이 중복됨`);
     need(s.practice?.length, `${at}: 실습 없음`);
     const itemIds = new Set();
     for (const q of s.quiz ?? []) {

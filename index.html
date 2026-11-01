@@ -96,6 +96,11 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
 .chip[disabled] { color: var(--fg); opacity: 1; cursor: default; }
 .chip .n { font-family: var(--mono); color: var(--accent); margin-right: 8px; }
 .solution { padding: 12px 14px; background: var(--bg); border-radius: 6px; white-space: pre-wrap; }
+.explain { white-space: pre-line; }
+.answer-key { font-weight: 700; }
+.answer-key ol { margin: 4px 0 0; padding-left: 1.3em; font-weight: 500; white-space: normal; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.prompt-box { min-height: 120px; font-size: .9rem; }
 .note { padding: 10px 14px; border-radius: 6px; background: var(--bad-bg); color: var(--bad); font-size: .9rem; }
 .score { font-family: var(--display); font-size: 2.4rem; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
 
@@ -119,7 +124,7 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
   const app = document.getElementById("app");
   const S = {
     topics: [], loadState: "loading", failedTopics: 0, progress: {}, saveError: "",
-    route: { name: "home" }, stage: "theory", qi: null, drafts: {}, orderDraft: {}
+    route: { name: "home" }, stage: "theory", qi: null, drafts: {}, orderDraft: {}, moreOpen: {}, copied: ""
   };
 
   /* ---------- 작은 유틸 ---------- */
@@ -330,7 +335,7 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
       }, o))),
       answered ? h("div", { class: "card" },
         h("div", { class: "verdict " + (chosen === q.answer ? "good" : "bad") }, chosen === q.answer ? "맞았어요" : "틀렸어요"),
-        h("p", null, rich(q.why))) : null,
+        h("p", { class: "explain" }, rich(q.why))) : null,
       answered ? h("button", { class: "btn wide", onclick: () => { S.qi = firstOpen(); rerender(); window.scrollTo(0, 0); } },
         firstOpen() === -1 ? "결과 보기" : "다음 문제") : null);
   }
@@ -346,7 +351,36 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
       h("button", { class: "btn wide", onclick: () => setStage("practice") }, "실습으로 넘어가기"),
       h("button", { class: "btn ghost wide", onclick: () => {
         p.quiz.answers = {}; save(t.id, s.id); S.qi = null; rerender();
-      } }, "처음부터 다시 풀기"));
+      } }, "처음부터 다시 풀기"),
+      moreCard(t, s, p, "quiz"));
+  }
+
+  /* 문제 더 만들기: 사이트에는 AI가 없으므로 Claude Code에 보낼 요청문을 만들어 준다 */
+  function moreRequest(t, s, p, kind) {
+    const wrong = p.quiz.wrongEver.filter(id => (s.quiz || []).some(q => q.id === id));
+    const what = kind === "quiz" ? "객관식 문제 10개" : "실습 5개";
+    const focus = wrong.length ? ` 내가 처음에 틀린 문제는 ${wrong.join(", ")}이니 이 개념을 중심으로 만들어 줘.` : "";
+    return `nekan-study 저장소의 CLAUDE.md를 따라 topics/${t.id}.json의 시나리오 ${s.id}에 ${what}를 더 추가해 줘.${focus} 검사를 통과시키고 main에 반영해 줘.`;
+  }
+  function moreCard(t, s, p, kind) {
+    const key = keyOf(t.id, s.id) + "/" + kind;
+    const label = kind === "quiz" ? "문제 더 만들기" : "실습 더 만들기";
+    if (!S.moreOpen[key]) {
+      return h("button", { class: "btn ghost wide", onclick: () => { S.moreOpen[key] = true; rerender(); } }, label);
+    }
+    const text = moreRequest(t, s, p, kind);
+    const boxId = "more-" + s.id + "-" + kind;
+    const copy = async () => {
+      try { await navigator.clipboard.writeText(text); S.copied = key; rerender(); }
+      catch { const box = document.getElementById(boxId); box.focus(); box.select(); }
+    };
+    return h("div", { class: "card" },
+      h("h3", null, label),
+      h("p", { class: "small" }, "새 문제는 Claude Code가 만들어 사이트에 올립니다. 아래 요청문을 복사해 Claude Code에 붙여 넣으세요. 사이트에 반영되면 지금 칸에 이어서 나옵니다."),
+      h("textarea", { id: boxId, class: "prompt-box", readonly: true, value: text, "aria-label": "Claude Code 요청문" }),
+      h("div", { class: "row" },
+        h("button", { class: "btn", onclick: copy }, S.copied === key ? "복사했어요" : "요청문 복사"),
+        h("a", { class: "btn ghost", href: "https://claude.ai/code", target: "_blank", rel: "noopener" }, "Claude Code 열기")));
   }
 
   /* 실습 */
@@ -378,7 +412,15 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
     return h("div", { class: "stack" },
       h("div", { class: "meter" }, `${count} / ${items.length} 해결`),
       items.map((item, n) => practiceCard(t, s, p, item, n, items, resolved)),
-      finished ? h("button", { class: "btn wide", onclick: () => setStage("apply") }, "응용으로 넘어가기") : null);
+      finished ? h("button", { class: "btn wide", onclick: () => setStage("apply") }, "응용으로 넘어가기") : null,
+      moreCard(t, s, p, "practice"));
+  }
+  function answerKey(item) {
+    if (item.type === "order") {
+      return h("div", { class: "answer-key" }, "모범답안", h("ol", null, item.items.map(x => h("li", null, x))));
+    }
+    const value = item.type === "number" ? `${item.answer}${item.unit ? " " + item.unit : ""}` : (item.accept || [])[0];
+    return h("div", { class: "answer-key" }, "모범답안: " + value);
   }
   function practiceCard(t, s, p, item, n, items, resolved) {
     const rec = p.practice.items[item.id] || { tries: 0 };
@@ -394,6 +436,12 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
       if (items.every(resolved)) p.practice.done = true;
       save(t.id, s.id); rerender();
     };
+    const retry = () => {
+      delete p.practice.items[item.id];
+      delete S.drafts[draftKey];
+      delete S.orderDraft[draftKey];
+      save(t.id, s.id); rerender();
+    };
     let control;
     if (item.type === "order") {
       const placed = S.orderDraft[draftKey] || (Array.isArray(rec.value) ? rec.value : []);
@@ -402,7 +450,7 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
       control = h("div", { class: "stack", style: "gap:10px" },
         placed.length ? h("div", { class: "chips" }, placed.map((i, pos) => h("button", {
           class: "chip placed", disabled: done, onclick: () => set(placed.filter(x => x !== i))
-        }, h("span", { class: "n" }, pos + 1), item.items[i]))) : h("p", { class: "muted small" }, "아래 항목을 순서대로 눌러 쌓으세요. 쌓은 항목을 누르면 빠집니다."),
+        }, h("span", { class: "n" }, pos + 1), item.items[i]))) : done ? null : h("p", { class: "muted small" }, "아래 항목을 순서대로 눌러 쌓으세요. 쌓은 항목을 누르면 빠집니다."),
         rest.length && !done ? h("div", { class: "chips" }, rest.map(i => h("button", { class: "chip", onclick: () => set([...placed, i]) }, item.items[i]))) : null,
         !done ? h("button", { class: "btn", disabled: rest.length > 0, onclick: () => commit(placed) }, "확인") : null);
     } else {
@@ -427,11 +475,13 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
       h("p", { style: "font-weight:500" }, rich(item.prompt)),
       control,
       rec.ok ? h("div", { class: "verdict good" }, "정답입니다") : null,
-      rec.revealed && !rec.ok ? h("div", { class: "verdict bad" }, "풀이를 확인했어요") : null,
+      rec.revealed && !rec.ok ? h("div", { class: "tag" }, "모범답안을 확인했어요. 이해한 뒤 다시 풀어 보세요.") : null,
       wrongNow ? h("div", { class: "verdict bad" }, "아직 아니에요. 다시 해 보세요.") : null,
       wrongNow && item.hint ? h("p", { class: "small muted" }, "힌트: ", rich(item.hint)) : null,
-      wrongNow && rec.tries >= 2 ? h("button", { class: "btn ghost", onclick: reveal }, "풀이 보기") : null,
-      done && item.solution ? h("div", { class: "solution" }, rich(item.solution)) : null);
+      !done ? h("button", { class: "btn ghost", onclick: reveal }, "모범답안 보기") : null,
+      done ? answerKey(item) : null,
+      done && item.solution ? h("div", { class: "solution" }, rich(item.solution)) : null,
+      done ? h("button", { class: "btn ghost", onclick: retry }, "다시 풀어 보기") : null);
   }
 
   /* 응용: 모범 답안과 점검 기준으로 스스로 채점 */
