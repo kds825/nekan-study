@@ -30,6 +30,7 @@ for (const id of ids) {
     need(s.theory?.length, `${at}: 이론 없음`);
     for (const b of s.theory ?? []) need(blocks.includes(b.t), `${at}: 알 수 없는 이론 블록 ${b.t}`);
     need((s.quiz?.length ?? 0) >= 30, `${at}: 문제가 30개보다 적음 (${s.quiz?.length ?? 0}개)`);
+    for (const l of [1, 3]) need((s.quiz ?? []).some(q => q.level === l), `${at}: level ${l} 문제가 없음`);
     const questions = (s.quiz ?? []).map(q => q.q);
     need(new Set(questions).size === questions.length, `${at}: 질문이 중복됨`);
     need(s.practice?.length, `${at}: 실습 없음`);
@@ -38,6 +39,7 @@ for (const id of ids) {
       need(q.id && !itemIds.has(q.id), `${at}: 문제 id 오류 또는 중복 ${q.id}`);
       itemIds.add(q.id);
       need(q.q && q.why, `${at}/${q.id}: 질문 또는 해설 없음`);
+      need([1, 2, 3].includes(q.level), `${at}/${q.id}: level은 1(기초), 2(응용), 3(심화) 중 하나여야 함`);
       need(Number.isInteger(q.answer) && q.answer >= 0 && q.answer < (q.options?.length ?? 0), `${at}/${q.id}: answer 범위 오류`);
     }
     for (const p of s.practice ?? []) {

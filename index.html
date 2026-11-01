@@ -96,6 +96,24 @@ textarea { width: 100%; min-height: 170px; resize: vertical; }
 .chip[disabled] { color: var(--fg); opacity: 1; cursor: default; }
 .chip .n { font-family: var(--mono); color: var(--accent); margin-right: 8px; }
 .solution { padding: 12px 14px; background: var(--bg); border-radius: 6px; white-space: pre-wrap; }
+[hidden] { display: none !important; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.tool { min-height: 40px; padding: 4px 12px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 500; font-size: .9rem; }
+.tool:hover { border-color: var(--accent); }
+.tool[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lv { display: inline-block; padding: 1px 8px; border-radius: 4px; border: 1.5px solid var(--accent); color: var(--accent); font-size: .78rem; font-weight: 700; }
+.lv.l1 { border-color: var(--line); color: var(--muted); }
+.lv.l3 { background: var(--accent); color: var(--accent-ink); }
+.levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.level-row { padding: 10px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; font-variant-numeric: tabular-nums; }
+.source { background: none; border: 0; padding: 0; color: var(--accent); font-size: .82rem; text-align: left; min-height: 32px; }
+.note-text { white-space: pre-wrap; }
+.search { width: 100%; }
+#selbar { position: fixed; left: 50%; transform: translateX(-50%); z-index: 6; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 4px 16px rgba(0, 0, 0, .28); white-space: nowrap; }
+#selbar.above-rail { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); z-index: 7; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding: 10px 16px; border-radius: 6px; background: var(--fg); color: var(--bg); font-size: .9rem; max-width: calc(100vw - 32px); }
+#toast.above-rail { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .explain { white-space: pre-line; }
 .answer-key { font-weight: 700; }
 .answer-key ol { margin: 4px 0 0; padding-left: 1.3em; font-weight: 500; white-space: normal; }
@@ -115,16 +133,23 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 </head>
 <body>
 <div id="app"></div>
+<button id="selbar" class="btn" type="button" hidden>선택한 내용 노트에 넣기</button>
+<div id="toast" role="status" hidden></div>
 <noscript>이 사이트를 쓰려면 JavaScript를 켜 주세요.</noscript>
 
 <script>
 (() => {
   const STAGES = [["theory", "이론"], ["quiz", "문제"], ["practice", "실습"], ["apply", "응용"]];
   const STORE_KEY = "nekan-progress-v1";
+  const NOTE_KEY = "nekan-notes-v1";
+  const LEVELS = { 1: "기초", 2: "응용", 3: "심화" };
+  const levelOf = q => LEVELS[q.level] ? q.level : 2;
   const app = document.getElementById("app");
   const S = {
     topics: [], loadState: "loading", failedTopics: 0, progress: {}, saveError: "",
-    route: { name: "home" }, stage: "theory", qi: null, drafts: {}, orderDraft: {}, moreOpen: {}, copied: ""
+    route: { name: "home" }, stage: "theory", qi: null, drafts: {}, orderDraft: {}, moreOpen: {}, moreLevel: {}, copied: "",
+    notes: [], noteDraft: "", noteQuery: "", editNote: null, editDraft: "", confirmDelete: null, backupMsg: "",
+    wrongTab: "open", review: {}, peek: {}, prevRoute: null, prevStage: null
   };
 
   /* ---------- 작은 유틸 ---------- */
@@ -163,7 +188,8 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     if (!S.progress[k]) S.progress[k] = { topicId: tid, scenarioId: sid };
     const p = S.progress[k];
     p.theory ||= {}; p.quiz ||= { answers: {}, wrongEver: [] }; p.practice ||= { items: {} }; p.apply ||= {};
-    p.quiz.answers ||= {}; p.quiz.wrongEver ||= []; p.practice.items ||= {};
+    p.quiz.answers ||= {}; p.quiz.wrongEver ||= []; p.quiz.wrongChoice ||= {}; p.quiz.reviewed ||= {};
+    p.practice.items ||= {}; p.practice.missed ||= []; p.practice.reviewed ||= {};
     return p;
   }
   const cellsOf = p => STAGES.map(([s]) => !!p?.[s]?.done);
@@ -174,9 +200,79 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     if (message !== S.saveError) { S.saveError = message; rerender(); }
   }
 
+  /* ---------- 노트: 이 브라우저에 저장 ---------- */
+  function loadNotes() {
+    try {
+      const parsed = JSON.parse(ls.get(NOTE_KEY) || "[]");
+      if (Array.isArray(parsed)) S.notes = parsed;
+    } catch { S.notes = []; }
+  }
+  function saveNotes() {
+    const ok = ls.set(NOTE_KEY, S.notes.length ? JSON.stringify(S.notes) : "");
+    S.saveError = ok ? "" : "이 브라우저에 노트를 저장하지 못했습니다. 시크릿 모드라면 일반 창에서 열어 주세요.";
+    return ok;
+  }
+  function addNote(text, source) {
+    S.notes.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), text, source: source || null, createdAt: new Date().toISOString() });
+    return saveNotes();
+  }
+  function currentSource() {
+    const r = S.route;
+    if (r.name === "learn") {
+      const t = findTopic(r.tid), s = findScenario(t, r.sid);
+      const stage = (STAGES.find(([k]) => k === S.stage) || [])[1];
+      if (s) return { tid: t.id, sid: s.id, label: `${t.title} · ${s.title} · ${stage}` };
+    }
+    if (r.name === "topic" && findTopic(r.tid)) return { tid: r.tid, label: findTopic(r.tid).title };
+    if (r.name === "wrong") return { label: "오답노트" };
+    return null;
+  }
+  let toastTimer;
+  function toast(message) {
+    const el = document.getElementById("toast");
+    el.textContent = message;
+    el.classList.toggle("above-rail", app.classList.contains("learning"));
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+  }
+
+  /* 드래그한 글을 노트에 넣기. 폰에서 버튼을 누르는 순간 선택이 풀려도 쓸 수 있게 글을 잠시 보관한다. */
+  function initSelectionBar() {
+    const bar = document.getElementById("selbar");
+    let picked = "", hideTimer;
+    document.addEventListener("selectionchange", () => {
+      const sel = window.getSelection();
+      const text = sel && !sel.isCollapsed ? sel.toString().trim() : "";
+      const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
+      if (text && !typing && S.route.name !== "notes" && sel.anchorNode && app.contains(sel.anchorNode)) {
+        clearTimeout(hideTimer);
+        picked = text;
+        bar.classList.toggle("above-rail", app.classList.contains("learning"));
+        bar.hidden = false;
+      } else if (!bar.hidden) {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { bar.hidden = true; picked = ""; }, 500);
+      }
+    });
+    bar.addEventListener("pointerdown", e => e.preventDefault());
+    bar.addEventListener("click", () => {
+      if (!picked) return;
+      const ok = addNote(picked, currentSource());
+      clearTimeout(hideTimer);
+      picked = "";
+      bar.hidden = true;
+      window.getSelection()?.removeAllRanges();
+      toast(ok ? "노트에 넣었어요" : "저장하지 못했습니다. 시크릿 모드인지 확인해 주세요.");
+      if (S.route.name === "home" || S.route.name === "wrong") rerender();
+      else refreshToolLinks();
+    });
+  }
+
   /* ---------- 라우팅 ---------- */
   function parseHash() {
     const raw = location.hash.slice(1);
+    if (raw === "wrong" || raw === "notes") return { name: raw };
     if (raw.startsWith("topic-")) return { name: "topic", tid: raw.slice(6) };
     if (raw.startsWith("learn-")) {
       const [tid, sid] = raw.slice(6).split("--");
@@ -185,6 +281,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     return { name: "home" };
   }
   function hashOf(r) {
+    if (r.name === "wrong" || r.name === "notes") return "#" + r.name;
     if (r.name === "topic") return "#topic-" + r.tid;
     if (r.name === "learn") return "#learn-" + r.tid + "--" + r.sid;
     return location.pathname + location.search;
@@ -199,8 +296,15 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     render(); window.scrollTo(0, 0);
   }
   function go(r) {
+    const isTool = x => x.name === "wrong" || x.name === "notes";
+    if (isTool(r) && !isTool(S.route)) { S.prevRoute = S.route; S.prevStage = S.stage; }
     history.pushState(null, "", hashOf(r));
     enter(r);
+  }
+  function leaveTools() {
+    const r = S.prevRoute || { name: "home" }, stage = S.prevStage;
+    go(r);
+    if (r.name === "learn" && stage) setStage(stage);
   }
   window.addEventListener("popstate", () => enter(parseHash()));
 
@@ -213,9 +317,191 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     app.className = learning ? "learning" : "";
     const notes = S.saveError ? h("div", { class: "note", role: "alert" }, S.saveError) : null;
     const view = learning ? viewLearn(findTopic(r.tid), learning)
+      : r.name === "wrong" ? viewWrong()
+      : r.name === "notes" ? viewNotes()
       : r.name === "topic" && findTopic(r.tid) ? viewTopic(findTopic(r.tid))
       : viewHome();
     app.replaceChildren(h("div", { class: "stack-l" }, notes, view));
+  }
+
+  /* ---------- 오답노트와 노트로 가는 버튼 ---------- */
+  function toolLinks() {
+    return h("div", { class: "tools", id: "tool-links" },
+      h("button", { class: "tool", onclick: () => go({ name: "wrong" }) }, `오답노트 ${wrongEntries().filter(e => !e.reviewed).length}`),
+      h("button", { class: "tool", onclick: () => go({ name: "notes" }) }, `노트 ${S.notes.length}`));
+  }
+  function refreshToolLinks() { document.getElementById("tool-links")?.replaceWith(toolLinks()); }
+
+  /* ---------- 오답노트 ---------- */
+  function wrongEntries() {
+    const out = [];
+    for (const t of S.topics) for (const s of t.scenarios || []) {
+      if (!S.progress[keyOf(t.id, s.id)]) continue;
+      const p = prog(t.id, s.id);
+      for (const q of s.quiz || []) if (p.quiz.wrongEver.includes(q.id)) {
+        out.push({ kind: "quiz", t, s, p, q, key: `${keyOf(t.id, s.id)}/${q.id}`, reviewed: !!p.quiz.reviewed[q.id] });
+      }
+      for (const item of s.practice || []) {
+        const rec = p.practice.items[item.id];
+        const missed = p.practice.missed.includes(item.id) || (rec && (rec.revealed || (rec.tries > 0 && !rec.ok) || rec.tries > 1));
+        if (missed) out.push({ kind: "practice", t, s, p, item, key: `${keyOf(t.id, s.id)}/${item.id}`, reviewed: !!p.practice.reviewed[item.id] });
+      }
+    }
+    return out;
+  }
+  function openInLearn(e, stage) {
+    return h("button", { class: "source", onclick: () => { go({ name: "learn", tid: e.t.id, sid: e.s.id }); setStage(stage); } }, `${e.t.title} · ${e.s.title}`);
+  }
+  function viewWrong() {
+    const all = wrongEntries();
+    const open = all.filter(e => !e.reviewed), done = all.filter(e => e.reviewed);
+    // 방금 맞힌 문제는 해설을 읽을 수 있게 다음에 들어올 때까지 이 탭에 남겨 둔다.
+    const list = S.wrongTab === "open" ? all.filter(e => !e.reviewed || S.review[e.key] !== undefined) : done;
+    return h("div", { class: "stack-l" },
+      h("div", { class: "stack" },
+        h("button", { class: "back", onclick: leaveTools }, "← 돌아가기"),
+        h("h1", null, "오답노트"),
+        h("p", { class: "muted small" }, "처음에 틀렸거나 답을 먼저 본 문제가 모입니다. 다시 맞히면 복습 완료로 옮겨집니다."),
+        h("div", { class: "tools" },
+          h("button", { class: "tool", "aria-pressed": String(S.wrongTab === "open"), onclick: () => { S.wrongTab = "open"; rerender(); } }, `복습할 문제 ${open.length}`),
+          h("button", { class: "tool", "aria-pressed": String(S.wrongTab === "done"), onclick: () => { S.wrongTab = "done"; rerender(); } }, `복습 완료 ${done.length}`))),
+      list.length ? h("div", { class: "stack" }, list.map(e => e.kind === "quiz" ? wrongQuizCard(e) : wrongPracticeCard(e)))
+        : h("div", { class: "card" }, h("p", { class: "muted" }, S.wrongTab === "open"
+          ? "복습할 문제가 없습니다. 틀린 문제가 생기면 여기에 모입니다."
+          : "아직 복습을 마친 문제가 없습니다.")));
+  }
+  function wrongQuizCard(e) {
+    const { q, p } = e;
+    const chosen = S.review[e.key], peek = S.peek[e.key];
+    const answered = chosen !== undefined || peek;
+    const mine = p.quiz.wrongChoice[q.id];
+    const pick = i => {
+      S.review[e.key] = i;
+      if (i === q.answer) { p.quiz.reviewed[q.id] = true; p.quiz.answers[q.id] = i; }
+      save(e.t.id, e.s.id); rerender();
+    };
+    return h("div", { class: "card" },
+      h("div", { class: "bar" }, openInLearn(e, "quiz"), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
+      h("p", { style: "font-weight:500" }, rich(q.q)),
+      answered && mine !== undefined && q.options[mine] ? h("p", { class: "small muted" }, "처음 고른 답: " + q.options[mine]) : null,
+      h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
+        class: "opt" + (answered && i === q.answer ? " right" : "") + (chosen === i && i !== q.answer ? " wrong" : ""),
+        disabled: !!answered, onclick: () => pick(i)
+      }, o))),
+      chosen !== undefined ? h("div", { class: "verdict " + (chosen === q.answer ? "good" : "bad") }, chosen === q.answer ? "맞았어요. 복습 완료로 옮겼어요." : "아직 틀렸어요. 해설을 읽고 다시 풀어 보세요.") : null,
+      answered ? h("p", { class: "explain" }, rich(q.why)) : null,
+      h("div", { class: "tools" },
+        !answered ? h("button", { class: "tool", onclick: () => { S.peek[e.key] = true; rerender(); } }, "해설 바로 보기") : null,
+        answered && !e.reviewed ? h("button", { class: "tool", onclick: () => { delete S.review[e.key]; delete S.peek[e.key]; rerender(); } }, "다시 풀기") : null,
+        peek && !e.reviewed ? h("button", { class: "tool", onclick: () => { p.quiz.reviewed[q.id] = true; save(e.t.id, e.s.id); rerender(); } }, "복습 완료로 옮기기") : null,
+        e.reviewed ? h("button", { class: "tool", onclick: () => { delete p.quiz.reviewed[q.id]; delete S.review[e.key]; delete S.peek[e.key]; save(e.t.id, e.s.id); rerender(); } }, "복습할 문제로 되돌리기") : null));
+  }
+  function wrongPracticeCard(e) {
+    const { item, p } = e;
+    const peek = S.peek[e.key];
+    return h("div", { class: "card" },
+      h("div", { class: "bar" }, openInLearn(e, "practice"), h("span", { class: "lv l1" }, "실습")),
+      h("p", { style: "font-weight:500" }, rich(item.prompt)),
+      peek ? answerKey(item) : null,
+      peek && item.solution ? h("div", { class: "solution" }, rich(item.solution)) : null,
+      h("div", { class: "tools" },
+        h("button", { class: "tool", onclick: () => { S.peek[e.key] = !peek; rerender(); } }, peek ? "모범답안 접기" : "모범답안 보기"),
+        !e.reviewed ? h("button", { class: "tool", onclick: () => { p.practice.reviewed[item.id] = true; save(e.t.id, e.s.id); rerender(); } }, "복습 완료로 옮기기")
+          : h("button", { class: "tool", onclick: () => { delete p.practice.reviewed[item.id]; save(e.t.id, e.s.id); rerender(); } }, "복습할 문제로 되돌리기")));
+  }
+
+  /* ---------- 노트 ---------- */
+  function noteCards() {
+    const query = S.noteQuery.trim().toLowerCase();
+    const list = S.notes.filter(n => !query || `${n.text} ${n.source?.label || ""}`.toLowerCase().includes(query));
+    if (!S.notes.length) return h("div", { class: "card" }, h("p", { class: "muted" }, "아직 노트가 없습니다. 위에 직접 적거나, 공부하다가 글을 드래그해서 넣어 보세요."));
+    if (!list.length) return h("p", { class: "muted" }, "검색 결과가 없습니다.");
+    return h("div", { class: "stack" }, list.map(noteCard));
+  }
+  function noteCard(n) {
+    const date = (n.createdAt || "").slice(0, 10);
+    const from = n.source?.label
+      ? (n.source.sid
+        ? h("button", { class: "source", onclick: () => go({ name: "learn", tid: n.source.tid, sid: n.source.sid }) }, n.source.label)
+        : h("span", { class: "tag" }, n.source.label))
+      : h("span", { class: "tag" }, "직접 쓴 노트");
+    if (S.editNote === n.id) {
+      return h("div", { class: "card" },
+        from,
+        h("textarea", { id: "edit-" + n.id, "aria-label": "노트 고치기", value: S.editDraft, oninput: e => { S.editDraft = e.target.value; } }),
+        h("div", { class: "tools" },
+          h("button", { class: "btn", onclick: () => {
+            const text = S.editDraft.trim();
+            if (text) { n.text = text; saveNotes(); }
+            S.editNote = null; rerender();
+          } }, "저장"),
+          h("button", { class: "btn ghost", onclick: () => { S.editNote = null; rerender(); } }, "취소")));
+    }
+    return h("div", { class: "card" },
+      h("div", { class: "bar" }, from, h("span", { class: "meter" }, date)),
+      h("p", { class: "note-text" }, rich(n.text)),
+      h("div", { class: "tools" },
+        h("button", { class: "tool", onclick: () => { S.editNote = n.id; S.editDraft = n.text; S.confirmDelete = null; rerender(); } }, "고치기"),
+        S.confirmDelete === n.id
+          ? h("button", { class: "tool", onclick: () => { S.notes = S.notes.filter(x => x.id !== n.id); S.confirmDelete = null; saveNotes(); rerender(); } }, "정말 지우기")
+          : h("button", { class: "tool", onclick: () => { S.confirmDelete = n.id; rerender(); } }, "지우기")));
+  }
+  function exportBackup() {
+    const data = { app: "nekan", version: 1, exportedAt: new Date().toISOString(), progress: S.progress, notes: S.notes };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const a = h("a", { href: url, download: `네칸공부-백업-${data.exportedAt.slice(0, 10)}.json` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    S.backupMsg = "백업 파일을 저장했습니다. 다른 기기에서는 이 파일을 불러오면 됩니다.";
+    rerender();
+  }
+  async function importBackup(file) {
+    try {
+      const data = JSON.parse(await file.text());
+      if (data?.app !== "nekan" || !Array.isArray(data.notes) || typeof data.progress !== "object") throw new Error("format");
+      const known = new Set(S.notes.map(n => n.id));
+      const incoming = data.notes.filter(n => n && n.id && typeof n.text === "string" && !known.has(n.id));
+      S.notes = [...S.notes, ...incoming].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      let merged = 0;
+      for (const [k, p] of Object.entries(data.progress || {})) {
+        if (!S.progress[k] || String(p?.updatedAt || "") > String(S.progress[k].updatedAt || "")) { S.progress[k] = p; merged++; }
+      }
+      const ok = ls.set(STORE_KEY, JSON.stringify(S.progress)) && saveNotes();
+      S.backupMsg = ok ? `불러왔습니다. 새 노트 ${incoming.length}개, 진행 기록 ${merged}개를 합쳤습니다.` : "불러왔지만 이 브라우저에 저장하지 못했습니다.";
+    } catch {
+      S.backupMsg = "이 파일은 불러올 수 없습니다. 네칸 공부에서 저장한 백업 파일인지 확인해 주세요.";
+    }
+    rerender();
+  }
+  function viewNotes() {
+    return h("div", { class: "stack-l" },
+      h("div", { class: "stack" },
+        h("button", { class: "back", onclick: leaveTools }, "← 돌아가기"),
+        h("h1", null, "노트"),
+        h("p", { class: "muted small" }, "공부하다가 글을 드래그하면 나타나는 버튼으로도 넣을 수 있습니다.")),
+      h("form", { class: "stack", style: "gap:8px", onsubmit: e => {
+        e.preventDefault();
+        const text = S.noteDraft.trim();
+        if (!text) return;
+        addNote(text, null);
+        S.noteDraft = ""; rerender();
+      } },
+        h("textarea", { id: "note-new", "aria-label": "새 노트", placeholder: "나중에 다시 볼 내용을 적어 보세요", value: S.noteDraft, oninput: e => { S.noteDraft = e.target.value; } }),
+        h("button", { class: "btn", type: "submit" }, "노트 저장")),
+      h("div", { class: "stack" },
+        S.notes.length ? h("input", { id: "note-search", class: "search", type: "text", "aria-label": "노트 검색", placeholder: "노트 검색", value: S.noteQuery, oninput: e => {
+          S.noteQuery = e.target.value;
+          document.getElementById("note-list").replaceChildren(noteCards());
+        } }) : null,
+        h("div", { id: "note-list" }, noteCards())),
+      h("section", { class: "stack", style: "gap:8px" },
+        h("h3", null, "백업"),
+        h("p", { class: "muted small" }, "노트와 진행 기록은 이 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 사라지니 가끔 파일로 저장해 두세요. 다른 기기로 옮길 때도 이 파일을 씁니다."),
+        h("div", { class: "row" },
+          h("button", { class: "btn ghost", onclick: exportBackup }, "백업 파일 저장"),
+          h("label", { class: "btn ghost", for: "backup-file", style: "display:inline-flex;align-items:center;cursor:pointer" }, "백업 불러오기"),
+          h("input", { id: "backup-file", type: "file", accept: "application/json,.json", hidden: true, onchange: e => { if (e.target.files[0]) importBackup(e.target.files[0]); } })),
+        S.backupMsg ? h("p", { class: "small", role: "status" }, S.backupMsg) : null));
   }
 
   /* ---------- 홈 ---------- */
@@ -237,6 +523,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     if (S.loadState === "ready" && !S.topics.length) {
       body.push(h("div", { class: "card" }, h("h3", null, "아직 토픽이 없어요"), h("p", { class: "muted" }, "토픽이 추가되면 여기에 나타납니다.")));
     }
+    if (S.loadState === "ready") body.push(toolLinks());
     if (S.failedTopics) body.push(h("div", { class: "note", role: "alert" }, `토픽 ${S.failedTopics}개를 불러오지 못했습니다. 새로 고침해 주세요.`));
     const resume = latestOpen();
     if (resume) {
@@ -272,7 +559,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   function viewTopic(t) {
     return h("div", { class: "stack-l" },
       h("div", { class: "stack" },
-        h("button", { class: "back", onclick: () => go({ name: "home" }) }, "← 전체 토픽"),
+        h("div", { class: "bar" }, h("button", { class: "back", onclick: () => go({ name: "home" }) }, "← 전체 토픽"), toolLinks()),
         h("h1", null, t.title),
         t.subtitle ? h("p", { class: "muted" }, t.subtitle) : null),
       h("div", { class: "stack" }, (t.scenarios || []).map(s =>
@@ -290,7 +577,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
         label, h("small", null, p[k].done ? "완료" : "")))));
     return h("div", { class: "stack-l" },
       h("div", { class: "stack" },
-        h("button", { class: "back", onclick: () => go({ name: "topic", tid: t.id }) }, "← " + t.title),
+        h("div", { class: "bar" }, h("button", { class: "back", onclick: () => go({ name: "topic", tid: t.id }) }, "← " + t.title), toolLinks()),
         h("h1", null, s.title)),
       stage, rail);
   }
@@ -322,12 +609,16 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     const q = qs[S.qi], chosen = a[q.id], answered = chosen !== undefined;
     const pick = i => {
       a[q.id] = i;
-      if (i !== q.answer && !p.quiz.wrongEver.includes(q.id)) p.quiz.wrongEver.push(q.id);
+      if (i !== q.answer) {
+        if (!p.quiz.wrongEver.includes(q.id)) p.quiz.wrongEver.push(q.id);
+        p.quiz.wrongChoice[q.id] = i;
+        delete p.quiz.reviewed[q.id];
+      }
       if (firstOpen() === -1) p.quiz.done = true;
       save(t.id, s.id); rerender();
     };
     return h("div", { class: "stack" },
-      h("div", { class: "meter" }, `문제 ${S.qi + 1} / ${qs.length}`),
+      h("div", { class: "row" }, h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)]), h("span", { class: "meter" }, `문제 ${S.qi + 1} / ${qs.length}`)),
       h("p", { style: "font-weight:500" }, rich(q.q)),
       h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
         class: "opt" + (answered && i === q.answer ? " right" : "") + (answered && i === chosen && i !== q.answer ? " wrong" : ""),
@@ -337,7 +628,8 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
         h("div", { class: "verdict " + (chosen === q.answer ? "good" : "bad") }, chosen === q.answer ? "맞았어요" : "틀렸어요"),
         h("p", { class: "explain" }, rich(q.why))) : null,
       answered ? h("button", { class: "btn wide", onclick: () => { S.qi = firstOpen(); rerender(); window.scrollTo(0, 0); } },
-        firstOpen() === -1 ? "결과 보기" : "다음 문제") : null);
+        firstOpen() === -1 ? "결과 보기"
+          : levelOf(qs[firstOpen()]) > levelOf(q) ? `다음 단계로: ${LEVELS[levelOf(qs[firstOpen()])]} 문제` : "다음 문제") : null);
   }
   function quizSummary(t, s, p, qs) {
     const a = p.quiz.answers;
@@ -345,6 +637,12 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     const firstTry = qs.length - p.quiz.wrongEver.filter(id => qs.some(q => q.id === id)).length;
     return h("div", { class: "stack" },
       h("div", { class: "row" }, h("div", { class: "score" }, `${firstTry}/${qs.length}`), h("p", { class: "muted small" }, "처음에 맞힌 문제")),
+      h("div", { class: "levels" }, [1, 2, 3].filter(l => qs.some(q => levelOf(q) === l)).map(l => {
+        const inLevel = qs.filter(q => levelOf(q) === l);
+        const right = inLevel.filter(q => !p.quiz.wrongEver.includes(q.id)).length;
+        return h("div", { class: "level-row" }, h("span", { class: `lv l${l}` }, LEVELS[l]), h("span", { class: "meter" }, `${right} / ${inLevel.length}`));
+      })),
+      p.quiz.wrongEver.length ? h("button", { class: "btn ghost wide", onclick: () => go({ name: "wrong" }) }, "오답노트에서 복습하기") : null,
       wrongNow.length ? h("button", { class: "btn ghost wide", onclick: () => {
         wrongNow.forEach(q => delete a[q.id]); save(t.id, s.id); S.qi = null; rerender();
       } }, `틀린 문제 ${wrongNow.length}개 다시 풀기`) : null,
@@ -358,7 +656,8 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   /* 문제 더 만들기: 사이트에는 AI가 없으므로 Claude Code에 보낼 요청문을 만들어 준다 */
   function moreRequest(t, s, p, kind) {
     const wrong = p.quiz.wrongEver.filter(id => (s.quiz || []).some(q => q.id === id));
-    const what = kind === "quiz" ? "객관식 문제 10개" : "실습 5개";
+    const level = S.moreLevel[keyOf(t.id, s.id)] || 3;
+    const what = kind === "quiz" ? `${LEVELS[level]}(level ${level}) 객관식 문제 10개` : "실습 5개";
     const focus = wrong.length ? ` 내가 처음에 틀린 문제는 ${wrong.join(", ")}이니 이 개념을 중심으로 만들어 줘.` : "";
     return `nekan-study 저장소의 CLAUDE.md를 따라 topics/${t.id}.json의 시나리오 ${s.id}에 ${what}를 더 추가해 줘.${focus} 검사를 통과시키고 main에 반영해 줘.`;
   }
@@ -377,6 +676,10 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     return h("div", { class: "card" },
       h("h3", null, label),
       h("p", { class: "small" }, "새 문제는 Claude Code가 만들어 사이트에 올립니다. 아래 요청문을 복사해 Claude Code에 붙여 넣으세요. 사이트에 반영되면 지금 칸에 이어서 나옵니다."),
+      kind === "quiz" ? h("div", { class: "tools" }, [1, 2, 3].map(l => h("button", {
+        class: "tool", "aria-pressed": String((S.moreLevel[keyOf(t.id, s.id)] || 3) === l),
+        onclick: () => { S.moreLevel[keyOf(t.id, s.id)] = l; S.copied = ""; rerender(); }
+      }, LEVELS[l]))) : null,
       h("textarea", { id: boxId, class: "prompt-box", readonly: true, value: text, "aria-label": "Claude Code 요청문" }),
       h("div", { class: "row" },
         h("button", { class: "btn", onclick: copy }, S.copied === key ? "복사했어요" : "요청문 복사"),
@@ -422,17 +725,24 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     const value = item.type === "number" ? `${item.answer}${item.unit ? " " + item.unit : ""}` : (item.accept || [])[0];
     return h("div", { class: "answer-key" }, "모범답안: " + value);
   }
+  function markMissed(p, item) {
+    if (!p.practice.missed.includes(item.id)) p.practice.missed.push(item.id);
+    delete p.practice.reviewed[item.id];
+  }
   function practiceCard(t, s, p, item, n, items, resolved) {
     const rec = p.practice.items[item.id] || { tries: 0 };
     const done = rec.ok || rec.revealed;
     const draftKey = keyOf(t.id, s.id) + "/" + item.id;
     const commit = value => {
-      p.practice.items[item.id] = { ...rec, tries: (rec.tries || 0) + 1, value, ok: isCorrect(item, value) };
+      const ok = isCorrect(item, value);
+      p.practice.items[item.id] = { ...rec, tries: (rec.tries || 0) + 1, value, ok };
+      if (!ok) markMissed(p, item);
       if (items.every(resolved)) p.practice.done = true;
       save(t.id, s.id); rerender();
     };
     const reveal = () => {
       p.practice.items[item.id] = { ...rec, revealed: true };
+      markMissed(p, item);
       if (items.every(resolved)) p.practice.done = true;
       save(t.id, s.id); rerender();
     };
@@ -529,6 +839,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
       const results = await Promise.allSettled(ids.map(id => fetchJson(`topics/${id}.json`).then(t => ({ ...t, id }))));
       S.topics = results.filter(r => r.status === "fulfilled").map(r => r.value)
         .sort((a, b) => String(b.addedAt || "").localeCompare(String(a.addedAt || "")));
+      for (const t of S.topics) for (const s of t.scenarios || []) (s.quiz || []).sort((a, b) => levelOf(a) - levelOf(b));
       S.failedTopics = results.length - S.topics.length;
       S.loadState = "ready";
     } catch { S.loadState = "error"; }
@@ -536,6 +847,8 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   }
 
   loadProgress();
+  loadNotes();
+  initSelectionBar();
   S.route = parseHash();
   render();
   loadTopics();
