@@ -353,6 +353,13 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     return h("button", { class: "source", onclick: () => { go({ name: "learn", tid: e.t.id, sid: e.s.id }); setStage(stage); } }, `${e.t.title} · ${e.s.title}`);
   }
   function viewWrong() {
+    if (S.loadState !== "ready") {
+      return h("div", { class: "stack" },
+        h("button", { class: "back", onclick: leaveTools }, "← 돌아가기"),
+        h("h1", null, "오답노트"),
+        S.loadState === "loading" ? h("p", { class: "muted" }, "문제를 불러오는 중입니다.")
+          : h("div", { class: "note", role: "alert" }, "문제를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로 고침해 주세요."));
+    }
     const all = wrongEntries();
     const open = all.filter(e => !e.reviewed), done = all.filter(e => e.reviewed);
     // 방금 맞힌 문제는 해설을 읽을 수 있게 다음에 들어올 때까지 이 탭에 남겨 둔다.
