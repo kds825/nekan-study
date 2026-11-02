@@ -130,6 +130,8 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .rail button[aria-current="step"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .rail small { display: block; font: 500 .68rem/1.3 var(--mono); }
 .check { border-left: 4px solid var(--accent); }
+.secs { display: flex; flex-wrap: wrap; gap: 6px; }
+.sec { font: 500 .78rem/1.4 var(--body); color: var(--accent); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; }
 .part { padding-top: 12px; border-top: 1.5px solid var(--line); }
 </style>
 </head>
@@ -152,7 +154,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   const app = document.getElementById("app");
   const S = {
     topics: [], loadState: "loading", failedTopics: 0, progress: {}, saveError: "",
-    route: { name: "home" }, stage: "learn", qi: null, drafts: {}, orderDraft: {}, moreOpen: {}, moreLevel: {}, copied: "",
+    route: { name: "home" }, stage: "learn", drafts: {}, orderDraft: {}, moreOpen: {}, moreLevel: {}, copied: "",
     notes: [], noteDraft: "", noteQuery: "", editNote: null, editDraft: "", confirmDelete: null, backupMsg: "",
     wrongTab: "open", review: {}, peek: {}, prevRoute: null, prevStage: null
   };
@@ -292,7 +294,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     return location.pathname + location.search;
   }
   function enter(r) {
-    S.route = r; S.qi = null;
+    S.route = r;
     if (r.name === "learn" && findScenario(findTopic(r.tid), r.sid)) {
       const p = prog(r.tid, r.sid);
       S.stage = p.theory.done ? "final" : "learn";
@@ -312,7 +314,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   }
   window.addEventListener("popstate", () => enter(parseHash()));
 
-  function setStage(s) { S.stage = tabOf(s); S.qi = null; render(); window.scrollTo(0, 0); }
+  function setStage(s) { S.stage = tabOf(s); render(); window.scrollTo(0, 0); }
   function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
 
   function render() {
@@ -393,6 +395,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     };
     return h("div", { class: "card" },
       h("div", { class: "bar" }, openInLearn(e, e.q.sec ? "learn" : "final"), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
+      h("div", { class: "secs" }, secTags(e.s, q)),
       h("p", { style: "font-weight:500" }, rich(q.q)),
       answered && mine !== undefined && q.options[mine] ? h("p", { class: "small muted" }, "처음 고른 답: " + q.options[mine]) : null,
       h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
@@ -584,6 +587,13 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   const sectionCount = s => (s.theory || []).filter(b => b.t === "h").length;
   const inlineOf = s => (s.quiz || []).filter(q => q.sec >= 1 && q.sec <= sectionCount(s));
   const finalOf = s => { const inl = new Set(inlineOf(s)); return (s.quiz || []).filter(q => !inl.has(q)); };
+  const headings = s => (s.theory || []).filter(b => b.t === "h").map(b => b.text);
+  /* 문제가 어느 이론 묶음에서 나왔는지. 바로 풀기는 sec, 종합문제는 ref(관련 묶음 번호 배열)를 쓴다. */
+  function secTags(s, q) {
+    const hs = headings(s);
+    const nums = (q.sec ? [q.sec] : Array.isArray(q.ref) ? q.ref : []).filter(n => hs[n - 1]);
+    return nums.length ? nums.map(n => h("span", { class: "sec" }, `${n}. ${hs[n - 1]}`)) : [h("span", { class: "sec" }, "여러 묶음 종합")];
+  }
   function viewLearn(t, s) {
     const p = prog(t.id, s.id);
     const stage = S.stage === "final" ? stageFinal(t, s, p) : stageLearn(t, s, p);
@@ -615,15 +625,16 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     const answered = inline.filter(q => p.quiz.answers[q.id] !== undefined).length;
     return h("div", { class: "stack" },
       h("div", { class: "situation" }, h("div", { class: "tag" }, "오늘의 상황"), h("p", null, rich(s.situation))),
-      groups.map((blocks, n) => [blocks.map(block), inline.filter(q => q.sec === n).map(q => inlineQuizCard(t, s, p, q))]),
+      groups.map((blocks, n) => [blocks.map(block), inline.filter(q => q.sec === n).map(q => quizCard(t, s, p, q, "바로 풀기"))]),
       inline.length ? h("div", { class: "meter" }, `바로 풀기 ${answered} / ${inline.length}`) : null,
       h("button", { class: "btn wide", onclick: () => { p.theory.done = true; save(t.id, s.id); setStage("final"); } },
         inline.length && answered < inline.length ? "종합으로 넘어가기 (남은 문제는 그대로 둡니다)" : "종합문제 풀기"));
   }
-  function inlineQuizCard(t, s, p, q) {
+  function quizCard(t, s, p, q, label) {
     const chosen = p.quiz.answers[q.id], answered = chosen !== undefined;
     return h("div", { class: "card check" },
-      h("div", { class: "row" }, h("span", { class: "tag" }, "바로 풀기"), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
+      h("div", { class: "row" }, h("span", { class: "tag" }, label), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
+      h("div", { class: "secs" }, secTags(s, q)),
       h("p", { style: "font-weight:500" }, rich(q.q)),
       h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
         class: "opt" + (answered && i === q.answer ? " right" : "") + (answered && i === chosen && i !== q.answer ? " wrong" : ""),
@@ -638,7 +649,11 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   function stageFinal(t, s, p) {
     const qs = finalOf(s);
     return h("div", { class: "stack-l" },
-      qs.length ? h("section", { class: "stack" }, h("h2", null, "종합문제"), stageQuiz(t, s, p, qs)) : null,
+      qs.length ? h("section", { class: "stack" }, h("h2", null, "종합문제"),
+        h("p", { class: "muted small" }, "여러 묶음을 엮는 문제입니다. 고르면 바로 해설이 나옵니다."),
+        qs.map((q, n) => quizCard(t, s, p, q, `종합 ${n + 1}`)),
+        h("div", { class: "meter" }, `종합문제 ${qs.filter(q => p.quiz.answers[q.id] !== undefined).length} / ${qs.length}`),
+        moreCard(t, s, p, "quiz")) : null,
       (s.practice || []).length ? h("section", { class: "stack part" }, h("h2", null, "실습"), stagePractice(t, s, p)) : null,
       s.apply ? h("section", { class: "stack part" }, h("h2", null, "응용"), stageApply(t, s, p)) : null);
   }
@@ -651,49 +666,6 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
       h("thead", null, h("tr", null, (b.head || []).map(c => h("th", null, c)))),
       h("tbody", null, (b.rows || []).map(r => h("tr", null, r.map(c => h("td", null, String(c))))))));
     return h("p", null, rich(b.text));
-  }
-
-  /* 문제 */
-  function stageQuiz(t, s, p, qs) {
-    const a = p.quiz.answers;
-    const firstOpen = () => qs.findIndex(q => a[q.id] === undefined);
-    if (S.qi === null) S.qi = firstOpen();
-    if (S.qi === -1 || !qs[S.qi]) return quizSummary(t, s, p, qs);
-    const q = qs[S.qi], chosen = a[q.id], answered = chosen !== undefined;
-    const pick = i => { recordAnswer(t, s, p, q, i); rerender(); };
-    return h("div", { class: "stack" },
-      h("div", { class: "row" }, h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)]), h("span", { class: "meter" }, `문제 ${S.qi + 1} / ${qs.length}`)),
-      h("p", { style: "font-weight:500" }, rich(q.q)),
-      h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
-        class: "opt" + (answered && i === q.answer ? " right" : "") + (answered && i === chosen && i !== q.answer ? " wrong" : ""),
-        disabled: answered, onclick: () => pick(i)
-      }, o))),
-      answered ? h("div", { class: "card" },
-        h("div", { class: "verdict " + (chosen === q.answer ? "good" : "bad") }, chosen === q.answer ? "맞았어요" : "틀렸어요"),
-        h("p", { class: "explain" }, rich(q.why))) : null,
-      answered ? h("button", { class: "btn wide", onclick: () => { S.qi = firstOpen(); rerender(); app.querySelector("h2")?.scrollIntoView(); } },
-        firstOpen() === -1 ? "결과 보기"
-          : levelOf(qs[firstOpen()]) > levelOf(q) ? `다음 단계로: ${LEVELS[levelOf(qs[firstOpen()])]} 문제` : "다음 문제") : null);
-  }
-  function quizSummary(t, s, p, qs) {
-    const a = p.quiz.answers;
-    const wrongNow = qs.filter(q => a[q.id] !== q.answer);
-    const firstTry = qs.filter(q => !p.quiz.wrongEver.includes(q.id)).length;
-    return h("div", { class: "stack" },
-      h("div", { class: "row" }, h("div", { class: "score" }, `${firstTry}/${qs.length}`), h("p", { class: "muted small" }, "처음에 맞힌 문제")),
-      h("div", { class: "levels" }, [1, 2, 3].filter(l => qs.some(q => levelOf(q) === l)).map(l => {
-        const inLevel = qs.filter(q => levelOf(q) === l);
-        const right = inLevel.filter(q => !p.quiz.wrongEver.includes(q.id)).length;
-        return h("div", { class: "level-row" }, h("span", { class: `lv l${l}` }, LEVELS[l]), h("span", { class: "meter" }, `${right} / ${inLevel.length}`));
-      })),
-      p.quiz.wrongEver.length ? h("button", { class: "btn ghost wide", onclick: () => go({ name: "wrong" }) }, "오답노트에서 복습하기") : null,
-      wrongNow.length ? h("button", { class: "btn ghost wide", onclick: () => {
-        wrongNow.forEach(q => delete a[q.id]); save(t.id, s.id); S.qi = null; rerender();
-      } }, `틀린 문제 ${wrongNow.length}개 다시 풀기`) : null,
-      h("button", { class: "btn ghost wide", onclick: () => {
-        qs.forEach(q => delete a[q.id]); save(t.id, s.id); S.qi = null; rerender();
-      } }, "종합문제 처음부터 다시 풀기"),
-      moreCard(t, s, p, "quiz"));
   }
 
   /* 문제 더 만들기: 사이트에는 AI가 없으므로 Claude Code에 보낼 요청문을 만들어 준다 */
