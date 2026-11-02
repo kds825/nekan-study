@@ -41,6 +41,8 @@ for (const id of ids) {
       need(q.q && q.why, `${at}/${q.id}: 질문 또는 해설 없음`);
       need([1, 2, 3].includes(q.level), `${at}/${q.id}: level은 1(기초), 2(응용), 3(심화) 중 하나여야 함`);
       need(Number.isInteger(q.answer) && q.answer >= 0 && q.answer < (q.options?.length ?? 0), `${at}/${q.id}: answer 범위 오류`);
+      const sections = (s.theory ?? []).filter(b => b.t === "h").length;
+      if (q.sec !== undefined) need(Number.isInteger(q.sec) && q.sec >= 1 && q.sec <= sections, `${at}/${q.id}: sec는 1부터 이론 소제목 수(${sections}) 사이여야 함`);
     }
     for (const p of s.practice ?? []) {
       need(p.id && !itemIds.has(p.id), `${at}: 실습 id 오류 또는 중복 ${p.id}`);
