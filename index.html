@@ -410,6 +410,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
       h("div", { class: "bar" }, openInLearn(e, e.q.sec ? "learn" : "final"), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
       h("div", { class: "secs" }, secTags(e.s, q)),
       h("p", { style: "font-weight:500" }, rich(q.q)),
+      codeBlock(q.code),
       answered && mine !== undefined && q.options[mine] ? h("p", { class: "small muted" }, "처음 고른 답: " + q.options[mine]) : null,
       h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
         class: "opt" + (answered && i === q.answer ? " right" : "") + (chosen === i && i !== q.answer ? " wrong" : ""),
@@ -429,6 +430,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     return h("div", { class: "card" },
       h("div", { class: "bar" }, openInLearn(e, "final"), h("span", { class: "lv l1" }, "실습")),
       h("p", { style: "font-weight:500" }, rich(item.prompt)),
+      codeBlock(item.code),
       peek ? answerKey(item) : null,
       peek && item.solution ? h("div", { class: "solution" }, rich(item.solution)) : null,
       h("div", { class: "tools" },
@@ -649,6 +651,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
       h("div", { class: "row" }, h("span", { class: "tag" }, label), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
       h("div", { class: "secs" }, secTags(s, q)),
       h("p", { style: "font-weight:500" }, rich(q.q)),
+      codeBlock(q.code),
       h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
         class: "opt" + (answered && i === q.answer ? " right" : "") + (answered && i === chosen && i !== q.answer ? " wrong" : ""),
         disabled: answered, onclick: () => { recordAnswer(t, s, p, q, i); rerender(); }
@@ -670,6 +673,8 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
       (s.practice || []).length ? h("section", { class: "stack part" }, h("h2", null, "실습"), stagePractice(t, s, p)) : null,
       s.apply ? h("section", { class: "stack part" }, h("h2", null, "응용"), stageApply(t, s, p)) : null);
   }
+  /* 문제에 딸린 코드. 들여쓰기를 살려 고정폭 글꼴로 보여 준다. */
+  const codeBlock = code => code ? h("div", { class: "formula", tabindex: "0" }, code) : null;
   function block(b) {
     if (b.t === "h") return h("h2", null, b.text);
     if (b.t === "formula") return h("div", { class: "formula", tabindex: "0" }, b.text);
@@ -809,6 +814,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     return h("div", { class: "card" + (done ? " ok" : "") },
       h("div", { class: "meter" }, `실습 ${n + 1}`),
       h("p", { style: "font-weight:500" }, rich(item.prompt)),
+      codeBlock(item.code),
       control,
       rec.ok ? h("div", { class: "verdict good" }, "정답입니다") : null,
       rec.revealed && !rec.ok ? h("div", { class: "tag" }, "모범답안을 확인했어요. 이해한 뒤 다시 풀어 보세요.") : null,

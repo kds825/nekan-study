@@ -39,6 +39,7 @@ for (const id of ids) {
       need(q.id && !itemIds.has(q.id), `${at}: 문제 id 오류 또는 중복 ${q.id}`);
       itemIds.add(q.id);
       need(q.q && q.why, `${at}/${q.id}: 질문 또는 해설 없음`);
+      need(q.code === undefined || typeof q.code === "string", `${at}/${q.id}: code는 문자열이어야 함`);
       need([1, 2, 3].includes(q.level), `${at}/${q.id}: level은 1(기초), 2(응용), 3(심화) 중 하나여야 함`);
       need(Number.isInteger(q.answer) && q.answer >= 0 && q.answer < (q.options?.length ?? 0), `${at}/${q.id}: answer 범위 오류`);
       const sections = (s.theory ?? []).filter(b => b.t === "h").length;
