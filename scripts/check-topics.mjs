@@ -59,6 +59,16 @@ for (const id of ids) {
   }
 }
 
+// 경고: 정답이 가장 긴 보기로 쏠리면 내용을 몰라도 맞힐 수 있다. 실패로 치지는 않는다.
+for (const id of ids) {
+  if (!files.includes(id)) continue;
+  for (const s of read(`${id}.json`).scenarios ?? []) {
+    const qs = s.quiz ?? [];
+    const longest = qs.filter(q => { const l = (q.options ?? []).map(o => String(o).length); return l[q.answer] === Math.max(...l); }).length;
+    if (qs.length && longest / qs.length > 0.4) console.warn(`경고 ${id}/${s.id}: 정답이 가장 긴 보기인 문제가 ${Math.round(longest / qs.length * 100)}% (40% 이하 권장)`);
+  }
+}
+
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
