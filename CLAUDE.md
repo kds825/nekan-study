@@ -10,7 +10,14 @@
   - 토픽 내용: `apps/nekan/topics/<id>.json`
   - 형식 검사: `node scripts/check-topics.mjs`
 
-예전 주소(`/nekan-study/#learn-…` 등)로 들어오면 첫 화면이 네칸 앱으로 넘겨 준다. 모든 앱은 같은 사이트(kds825.github.io)라 localStorage를 함께 쓰므로, 새 앱은 저장 키 이름을 앱 id로 시작해 겹치지 않게 한다(네칸은 `nekan-`).
+예전 주소(`/nekan-study/#learn-…` 등)로 들어오면 첫 화면이 네칸 앱으로 넘겨 준다.
+
+**앱끼리 데이터를 섞지 않는다**(사용자 결정). 모든 앱이 같은 사이트(kds825.github.io)라 브라우저 저장소를 함께 쓰므로 규칙으로 나눈다.
+- 각 앱은 `<id>-`로 시작하는 키만 읽고 쓴다(네칸 `nekan-`, Connect `connect-`). 다른 앱의 키를 읽지 않고, 저장소 전체를 훑거나 지우지 않는다(`localStorage.clear`, `key()`, 전체 순회 금지).
+- 첫 화면은 앱 데이터를 읽지 않는다. 각 앱이 숫자 요약 한 줄을 `platform-summary:<id>`에 남기고(`publishSummary()`), 첫 화면은 그 키만 읽는다. 요약에는 이름·연락처 같은 내용을 넣지 않는다.
+- 백업·지우기는 그 앱의 키만 다룬다.
+- `node scripts/check-apps.mjs`가 이 규칙(키 접두어, 금지 API, 첫 화면 읽기 범위)을 검사한다. 옛 키를 옮기는 한 줄은 `// storage-migration` 주석으로 검사에서 뺀다.
+- 한계: 같은 사이트라 브라우저 수준에서 완전히 막히지는 않는다. 완전히 나누려면 앱마다 다른 도메인이 필요하다.
 
 ## Connect 앱 (`apps/connect/`)
 
@@ -30,7 +37,7 @@
 플랫폼 첫 화면의 "새 앱 만들기"가 만든 요청문이 올 수 있다.
 
 1. `apps/<id>/index.html`에 앱을 만든다. id는 영문 소문자, 숫자, 하이픈. 네칸과 같은 색 토큰(밝은·어두운 모드)과 모바일 우선 레이아웃을 쓰고, 첫 화면 위에 `../../`로 가는 "← 공부방" 링크를 둔다.
-2. `apps.json`의 `apps` 배열에 `id`, `name`, `description`, `path`(`apps/<id>/`), `icon`, `status`(`live` 또는 `soon`), `addedAt`을 넣는다. 첫 화면에 앱별 현황을 보이려면 `index.html`의 `SUMMARY`에 그 앱의 저장 키를 읽는 함수를 더한다.
+2. `apps.json`의 `apps` 배열에 `id`, `name`, `description`, `path`(`apps/<id>/`), `icon`, `status`(`live` 또는 `soon`), `addedAt`을 넣는다. 첫 화면에 앱별 현황을 보이려면 앱 안에서 `platform-summary:<id>`에 요약 한 줄을 남긴다(첫 화면은 앱 데이터를 직접 읽지 않는다).
 3. `node scripts/check-apps.mjs`와 `node scripts/check-topics.mjs`를 통과시키고, 브라우저로 첫 화면과 앱을 열어 확인한 뒤 커밋하고 푸시한다.
 
 `main` 브랜치에 들어간 내용이 사이트에 배포된다. 작업 브랜치에 푸시한 것은 아직 배포된 것이 아니다. 작업 브랜치라면 `main`에 병합할 PR을 만들고, 병합해야 사이트에 반영된다고 사용자에게 알린다.

@@ -102,34 +102,16 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
   };
   const letterIcon = name => svg(`<svg class="icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="8" fill="none" stroke="var(--accent)" stroke-width="3"/><text x="24" y="31" text-anchor="middle" font-size="20" fill="var(--accent)" font-family="sans-serif">${String(name || "?").slice(0, 1).replace(/[<&>"]/g, "")}</text></svg>`);
 
-  /* 앱별 짧은 현황. 앱이 브라우저에 남긴 기록을 읽기만 한다. */
-  const SUMMARY = {
-    connect() {
-      try {
-        const d = JSON.parse(localStorage.getItem("connect-data-v1") || "null");
-        const list = d?.contacts || [];
-        if (!list.length) return "아직 불러온 명함이 없습니다";
-        const t = new Date().toISOString().slice(0, 10);
-        const due = list.filter(c => c.nextAt && c.nextAt <= t).length;
-        return `${d.sample ? "샘플 " : ""}${list.length}명 · 회사 ${new Set(list.map(c => c.company).filter(Boolean)).size}곳` + (due ? ` · 연락할 사람 ${due}명` : "");
-      } catch { return null; }
-    },
-    nekan() {
-      try {
-        const progress = JSON.parse(localStorage.getItem("nekan-progress-v1") || "{}");
-        const list = Object.values(progress).filter(p => p && p.updatedAt);
-        if (!list.length) return "아직 시작한 시나리오가 없습니다";
-        const cells = list.reduce((n, p) => n + ["theory", "quiz", "practice", "apply"].filter(k => p[k]?.done).length, 0);
-        const wrong = list.reduce((n, p) => n + (p.quiz?.wrongEver || []).filter(id => !p.quiz?.reviewed?.[id]).length, 0);
-        return `시나리오 ${list.length}개 진행 · 채운 칸 ${cells}개 · 복습할 문제 ${wrong}개`;
-      } catch { return null; }
-    }
-  };
+  /* 앱별 짧은 현황. 첫 화면은 앱 데이터를 직접 읽지 않고, 각 앱이 남긴 요약 한 줄(platform-summary:<id>)만 읽는다. */
+  function summaryOf(id) {
+    try { const d = JSON.parse(localStorage.getItem("platform-summary:" + id) || "null"); return d?.text ? String(d.text) : null; }
+    catch { return null; }
+  }
 
   function appCard(a) {
     const live = a.status === "live";
     const icon = ICONS[a.icon] ? svg(ICONS[a.icon]) : letterIcon(a.name);
-    const summary = live && SUMMARY[a.id] ? SUMMARY[a.id]() : null;
+    const summary = live ? summaryOf(a.id) : null;
     const body = el("div", { class: "body" },
       el("span", { class: "badge" + (live ? "" : " soon") }, live ? "사용 중" : "준비 중"),
       el("h3", null, a.name),
