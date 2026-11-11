@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Connect</title>
+<meta name="description" content="리멤버에서 내보낸 명함을 이 기기 안에서만 정리하고, 사람과 회사를 묻고 찾는 인맥 앱.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d6b66">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='12' r='5' fill='%230d6b66'/%3E%3Ccircle cx='22' cy='12' r='5' fill='none' stroke='%230d6b66' stroke-width='2.5'/%3E%3Cpath d='M3 27c1-5 4-7 8-7s7 2 8 7' fill='%230d6b66'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 공부방과 같은 모눈종이 바탕. 위쪽 탭(사람·묻기·가져오기)으로 오가고, 한 줄 단에 카드를 쌓는다.
+   명함 데이터는 이 브라우저의 localStorage에만 두며 서버나 저장소로 보내지 않는다. */
+:root {
+  color-scheme: light dark;
+  --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
+  --accent: #0d6b66; --accent-ink: #ffffff; --mark: #ffe45c; --mark-fg: #16282b;
+  --good: #17693f; --good-bg: #e2f4e9; --bad: #a93127; --bad-bg: #fbe9e6;
+  --display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #10191b; --grid: #162225; --fg: #e6eeec; --muted: #9db0ae; --surface: #18262a; --line: #2f4346;
+  --accent: #4fc4ba; --accent-ink: #08201f; --mark: #5c5000; --mark-fg: #fff4b0;
+  --good: #6ad698; --good-bg: #12301f; --bad: #ff9c8f; --bad-bg: #3a1a16;
+} }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background-color: var(--bg); color: var(--fg); font: 400 16px/1.65 var(--body); word-break: keep-all; overflow-wrap: anywhere;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#app { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.25; margin: 0; }
+h1 { font-size: 2rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+.muted { color: var(--muted); } .small { font-size: .88rem; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.back { display: inline-flex; align-items: center; min-height: 40px; color: var(--accent); text-decoration: none; font-weight: 500; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; position: sticky; top: 0; z-index: 3; background: var(--bg); padding-block: 6px; }
+.tabs button { min-height: 44px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--accent); font: 400 1.05rem var(--display); cursor: pointer; }
+.tabs button[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.card { padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
+.person { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 12px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; color: inherit; font: inherit; cursor: pointer; }
+.person:hover, .person:focus-visible { border-color: var(--accent); outline: none; }
+.avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 400 1.1rem var(--display); }
+.person .who { min-width: 0; flex: 1; }
+.person .name { font-weight: 700; }
+.person .sub { font-size: .86rem; color: var(--muted); }
+.tag { display: inline-block; font: 500 .75rem/1.5 var(--mono); padding: 0 8px; border-radius: 4px; border: 1px solid var(--accent); color: var(--accent); }
+.tag.due { border-color: var(--bad); color: var(--bad); }
+input, textarea, select { width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; min-height: 44px; }
+textarea { min-height: 88px; resize: vertical; }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn { min-height: 44px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font: 700 .95rem var(--body); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+.btn[disabled] { opacity: .5; cursor: default; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { min-height: 36px; padding: 4px 12px; border-radius: 18px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font: 500 .86rem var(--body); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+dt { color: var(--muted); font-size: .88rem; } dd { margin: 0; }
+.log { border-left: 3px solid var(--accent); padding: 2px 0 2px 10px; }
+.log time { font: 500 .8rem var(--mono); color: var(--muted); }
+.msg { padding: 10px 14px; border-radius: 10px; max-width: 92%; }
+.msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); }
+.msg.bot { align-self: flex-start; background: var(--surface); border: 1.5px solid var(--line); width: 100%; max-width: 100%; }
+.msg.bot .how { font-size: .8rem; color: var(--muted); }
+.note { padding: 10px 14px; border-radius: 6px; border: 1.5px solid var(--line); font-size: .88rem; }
+.note.bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+.note.good { background: var(--good-bg); color: var(--good); border-color: var(--good); }
+.map { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; align-items: center; font-size: .9rem; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: .85rem; min-width: 100%; }
+th, td { border: 1px solid var(--line); padding: 4px 8px; white-space: nowrap; text-align: left; }
+mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+  const KEY = "connect-data-v1";
+  const app = document.getElementById("app");
+  const S = { route: "people", pid: null, q: "", filter: "all", chat: [], ask: "", importState: null, msg: "", editing: false };
+  let DB = { version: 1, contacts: [], importedAt: null, sample: false };
+
+  /* ---------- 작은 유틸 ---------- */
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "value") el.value = v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat(Infinity)) if (c !== null && c !== undefined && c !== false) el.append(c);
+    return el;
+  }
+  const today = () => new Date().toISOString().slice(0, 10);
+  const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+  const norm = s => String(s ?? "").toLowerCase().replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|inc\.?|co\.?,?\s*ltd\.?|corp\.?|corporation|limited/g, "").replace(/[\s.,·\-_()]/g, "");
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const lastContact = c => (c.logs || []).map(l => l.d).sort().at(-1) || null;
+  const isDue = c => c.nextAt && c.nextAt <= today();
+
+  function load() {
+    try { const d = JSON.parse(localStorage.getItem(KEY) || "null"); if (d && Array.isArray(d.contacts)) DB = d; } catch { /* 비어 있으면 새로 시작 */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
+    catch { S.msg = "이 브라우저에 저장하지 못했습니다. 시크릿 모드라면 일반 창에서 열어 주세요."; return false; }
+  }
+  const byId = id => DB.contacts.find(c => c.id === id);
+
+  /* ---------- 라우팅 ---------- */
+  function parseHash() {
+    const r = location.hash.slice(1);
+    if (r.startsWith("p-")) return { route: "person", pid: r.slice(2) };
+    if (["ask", "import"].includes(r)) return { route: r };
+    return { route: "people" };
+  }
+  function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else render(); }
+  window.addEventListener("hashchange", () => { Object.assign(S, parseHash(), { editing: false }); render(); window.scrollTo(0, 0); });
+
+  /* ---------- 엑셀·CSV 읽기 ---------- */
+  let xlsxReady;
+  function loadXlsx() {
+    xlsxReady ||= new Promise((ok, fail) => {
+      const s = document.createElement("script");
+      s.src = "vendor/xlsx.full.min.js"; s.onload = () => ok(window.XLSX); s.onerror = () => fail(new Error("엑셀 읽기 도구를 불러오지 못했습니다."));
+      document.head.append(s);
+    });
+    return xlsxReady;
+  }
+  async function readRows(file) {
+    const XLSX = await loadXlsx();
+    const buf = await file.arrayBuffer();
+    let wb;
+    if (/\.csv$|\.txt$/i.test(file.name)) {
+      let text;
+      try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch { text = new TextDecoder("euc-kr").decode(buf); }
+      wb = XLSX.read(text.replace(/^﻿/, ""), { type: "string", raw: true });
+    } else {
+      wb = XLSX.read(buf, { type: "array", cellDates: true });
+    }
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+    // 제목 줄이 위에 있는 파일이 있어, 칸이 가장 많이 찬 앞쪽 줄을 머리글로 본다.
+    let hi = 0, best = -1;
+    grid.slice(0, 10).forEach((r, i) => { const n = r.filter(v => String(v).trim()).length; if (n > best) { best = n; hi = i; } });
+    const headers = (grid[hi] || []).map(v => String(v).trim());
+    const rows = grid.slice(hi + 1).filter(r => r.some(v => String(v).trim()));
+    return { headers, rows };
+  }
+
+  /* 머리글 이름으로 칸 뜻을 짐작한다. 순서가 중요하다: '회사전화'는 회사가 아니라 전화다. */
+  const FIELDS = [
+    ["name", "이름"], ["lastName", "성"], ["firstName", "이름(성 뺀)"], ["company", "회사"], ["dept", "부서"], ["title", "직책"],
+    ["mobile", "휴대폰"], ["phone", "전화"], ["email", "이메일"], ["address", "주소"], ["website", "웹사이트"],
+    ["cardMemo", "명함 메모"], ["registeredAt", "등록일"], ["group", "그룹"]
+  ];
+  const RULES = [
+    ["email", /e-?mail|이메일|메일/i], ["mobile", /휴대|핸드폰|모바일|mobile|cell/i], ["skip", /팩스|fax/i],
+    ["phone", /전화|tel|phone|유선|직통/i], ["address", /주소|address/i], ["website", /홈페이지|웹|website|url|sns/i],
+    ["dept", /부서|department|dept/i], ["title", /직책|직위|직급|직함|title|position/i],
+    ["company", /회사|company|기관|소속|organization|단체/i], ["lastName", /^(성|last ?name|family ?name|surname)$/i],
+    ["firstName", /^(first ?name|given ?name)$/i], ["name", /이름|성명|name/i], ["cardMemo", /메모|노트|memo|note|비고/i],
+    ["registeredAt", /등록|교환|날짜|date|일자/i], ["group", /그룹|group|분류|카테고리/i]
+  ];
+  function guessMap(headers) {
+    const used = new Set();
+    return headers.map(hd => {
+      const rule = RULES.find(([, re]) => re.test(hd));
+      const f = rule ? rule[0] : "skip";
+      if (f === "skip" || used.has(f)) return "skip";
+      used.add(f); return f;
+    });
+  }
+  function rowsToContacts(headers, rows, map) {
+    return rows.map(r => {
+      const c = {};
+      map.forEach((f, i) => { if (f !== "skip") { const v = String(r[i] ?? "").trim(); if (v && !c[f]) c[f] = v; } });
+      if (!c.name && (c.lastName || c.firstName)) c.name = `${c.lastName || ""}${c.firstName || ""}`.trim();
+      delete c.lastName; delete c.firstName;
+      return c;
+    }).filter(c => c.name || c.company || c.email || c.mobile);
+  }
+  const keyOf = c => (c.email && "e:" + c.email.toLowerCase()) || (c.mobile && "m:" + c.mobile.replace(/\D/g, "")) || "n:" + norm(c.name) + "|" + norm(c.company);
+  function mergeContacts(incoming) {
+    if (DB.sample) { DB.contacts = []; DB.sample = false; }
+    const index = new Map(DB.contacts.map(c => [keyOf(c), c]));
+    let added = 0, updated = 0;
+    const now = new Date().toISOString();
+    for (const n of incoming) {
+      const old = index.get(keyOf(n));
+      if (old) { Object.assign(old, n, { updatedAt: now }); updated++; }
+      else { const c = { id: uid(), tags: [], notes: "", logs: [], nextAt: "", createdAt: now, updatedAt: now, ...n }; DB.contacts.push(c); index.set(keyOf(c), c); added++; }
+    }
+    DB.importedAt = now;
+    return { added, updated };
+  }
+
+  /* ---------- 샘플 (모두 가상의 인물·회사) ---------- */
+  function loadSample() {
+    const d = n => { const t = new Date(); t.setDate(t.getDate() - n); return t.toISOString().slice(0, 10); };
+    const S1 = [
+      ["김하늘", "가온테크", "재무팀", "팀장", ["고객사"], [[d(20), "예산 시즌 미팅, 내년 ERP 교체 검토 중"]], d(-3)],
+      ["이도윤", "가온테크", "경영지원본부", "CFO", ["고객사", "의사결정자"], [[d(130), "연말 인사 차 방문"]], ""],
+      ["박서연", "누리바이오", "회계팀", "과장", ["잠재고객"], [], ""],
+      ["최민준", "누리바이오", "대표이사실", "대표이사", ["의사결정자"], [[d(200), "세미나에서 명함 교환"]], ""],
+      ["정예린", "다솜물산", "영업1팀", "차장", ["파트너"], [[d(8), "공동 제안서 일정 협의"]], d(0)],
+      ["강지호", "다솜물산", "IT전략팀", "부장", ["파트너"], [[d(95), "보안 점검 요청 받음"]], ""],
+      ["윤채원", "라온제조", "구매팀", "대리", ["고객사"], [[d(40), "견적 재요청"]], d(5)],
+      ["임준서", "라온제조", "생산관리팀", "팀장", ["고객사"], [], ""],
+      ["한유나", "마루컨설팅", "인사팀", "매니저", [], [[d(400), "채용 박람회"]], ""],
+      ["오승현", "바다회계법인", "감사본부", "파트너", ["자문"], [[d(15), "IFRS 18 영향 분석 문의"]], d(-30)],
+      ["서지민", "바다회계법인", "세무본부", "시니어", ["자문"], [], ""],
+      ["문태경", "사랑병원", "기획조정실", "실장", ["잠재고객"], [[d(60), "AI 도입 상담"]], ""]
+    ];
+    const now = new Date().toISOString();
+    DB = { version: 1, sample: true, importedAt: now, contacts: S1.map(([name, company, dept, title, tags, logs, nextAt], i) => ({
+      id: "s" + i, name, company, dept, title, tags, nextAt, notes: "", createdAt: now, updatedAt: now,
+      mobile: `010-0000-${String(1000 + i).slice(-4)}`, email: `sample${i}@example.com`,
+      logs: logs.map(([dd, t]) => ({ d: dd, t }))
+    })) };
+    save(); go("people");
+  }
+
+  /* ---------- 묻기: 기기 안에서 규칙으로 답한다 ---------- */
+  const ROLES = {
+    "재무·회계": ["재무", "회계", "경리", "자금", "finance", "cfo", "ir", "세무", "감사"],
+    "영업": ["영업", "세일즈", "sales", "사업개발", "bd", "판매"],
+    "마케팅": ["마케팅", "marketing", "홍보", "브랜드", "pr"],
+    "인사": ["인사", "hr", "채용", "총무"],
+    "IT": ["it", "전산", "정보", "개발", "cto", "시스템", "보안", "디지털", "dx", "ax"],
+    "구매": ["구매", "조달", "purchasing", "소싱"],
+    "법무": ["법무", "legal", "컴플라이언스", "준법"],
+    "생산": ["생산", "제조", "품질", "공장"],
+    "기획": ["기획", "전략", "경영지원", "조정"],
+    "임원": ["대표", "ceo", "사장", "부사장", "전무", "상무", "이사", "임원", "본부장", "cfo", "cto", "coo", "파트너", "실장"]
+  };
+  const ROLE_TRIGGERS = { "재무·회계": ["재무", "회계", "경리", "자금", "세무"], "영업": ["영업", "세일즈"], "마케팅": ["마케팅", "홍보"], "인사": ["인사", "채용"], "IT": ["it", "전산", "개발", "보안", "디지털", "ai"], "구매": ["구매", "조달"], "법무": ["법무", "컴플라이언스"], "생산": ["생산", "제조", "품질"], "기획": ["기획", "전략"], "임원": ["임원", "대표", "경영진", "의사결정", "ceo", "사장", "c레벨"] };
+  const textOf = c => norm(`${c.title || ""} ${c.dept || ""}`);
+  /* 영문 약어(it, pr, cfo…)는 낱말 단위로만, 한글은 포함 여부로 맞춘다. 'director' 안의 'ir'을 재무로 잡지 않기 위해서다. */
+  function roleHit(c, term) {
+    if (/^[a-z]+$/.test(term)) return new RegExp(`(^|[^a-z])${term}([^a-z]|$)`, "i").test(`${c.title || ""} ${c.dept || ""}`);
+    return textOf(c).includes(norm(term));
+  }
+  function askHas(q, term) {
+    if (/^[a-z]+$/.test(term)) return new RegExp(`(^|[^a-z])${term}([^a-z]|$)`, "i").test(q);
+    return norm(q).includes(term);
+  }
+
+  function parseDays(q) {
+    const m = q.match(/(\d+)\s*(일|주|개월|달|년)/);
+    if (!m) return null;
+    const n = +m[1];
+    return { 일: n, 주: n * 7, 개월: n * 30, 달: n * 30, 년: n * 365 }[m[2]];
+  }
+  function answer(qRaw) {
+    const q = qRaw.trim(), qn = norm(q);
+    const how = [];
+    let list = DB.contacts.slice();
+    if (!list.length) return { text: "아직 명함이 없습니다. '가져오기' 탭에서 리멤버 엑셀을 올리거나 샘플로 둘러보세요.", how: [], people: [] };
+
+    // 1) 이름이 그대로 들어 있으면 그 사람 소개
+    const named = DB.contacts.filter(c => c.name && c.name.length >= 2 && q.includes(c.name));
+    if (named.length && !/누구|사람|명/.test(q.replace(named[0].name, ""))) {
+      return { text: named.length === 1 ? null : `이름이 같은 사람이 ${named.length}명 있습니다.`, how: [`이름 '${named[0].name}'`], people: named, profile: named.length === 1 ? named[0] : null };
+    }
+    // 2) 회사
+    const companies = [...new Set(DB.contacts.map(c => c.company).filter(Boolean))];
+    const hitCo = companies.filter(co => norm(co).length >= 2 && qn.includes(norm(co)));
+    if (hitCo.length) { const set = new Set(hitCo.map(norm)); list = list.filter(c => set.has(norm(c.company))); how.push(`회사: ${hitCo.join(", ")}`); }
+    // 3) 직무·직급
+    const roles = Object.entries(ROLE_TRIGGERS).filter(([, ws]) => ws.some(w => askHas(q, w))).map(([r]) => r);
+    if (roles.length) { list = list.filter(c => roles.some(r => ROLES[r].some(w => roleHit(c, w)))); how.push(`직무: ${roles.join(", ")}`); }
+    // 4) 태그 (#태그 또는 태그 이름 그대로)
+    const tags = [...new Set(DB.contacts.flatMap(c => c.tags || []))];
+    const hitTags = tags.filter(t => q.includes(t));
+    if (hitTags.length) { list = list.filter(c => hitTags.every(t => (c.tags || []).includes(t))); how.push(`태그: ${hitTags.join(", ")}`); }
+    // 5) 시간 조건
+    const days = parseDays(q);
+    if (/연락.*(안|못|없)|안\s*만난|못\s*만난|소홀|오래/.test(q)) {
+      const lim = days || 90;
+      list = list.filter(c => { const l = lastContact(c); return !l || daysBetween(l, today()) >= lim; });
+      how.push(`마지막 연락이 ${lim}일 넘었거나 기록 없음`);
+    } else if (/최근|요즘|지난|이번\s*달/.test(q) && /(만난|연락|미팅|통화)/.test(q)) {
+      const lim = days || (/이번\s*주/.test(q) ? 7 : 30);
+      list = list.filter(c => { const l = lastContact(c); return l && daysBetween(l, today()) <= lim; });
+      how.push(`최근 ${lim}일 안에 연락`);
+    }
+    if (/(연락할|챙길|팔로|후속|약속|예정|할\s*일)/.test(q)) {
+      const lim = /이번\s*주|일주일/.test(q) ? 7 : /이번\s*달|한\s*달/.test(q) ? 30 : 0;
+      const end = new Date(); end.setDate(end.getDate() + lim);
+      const e = end.toISOString().slice(0, 10);
+      list = list.filter(c => c.nextAt && c.nextAt <= e);
+      how.push(lim ? `다음 연락일이 ${lim}일 안` : "다음 연락일이 오늘이거나 지남");
+    }
+    // 6) 아무 조건도 못 찾으면 낱말 검색
+    if (!how.length) {
+      const words = q.split(/\s+/).map(norm).filter(w => w.length >= 2 && !/^(누구|사람|알려|찾아|있어|있나|보여|목록|명함)/.test(w));
+      if (words.length) {
+        list = list.filter(c => { const blob = norm(Object.values({ a: c.name, b: c.company, d: c.dept, t: c.title, n: c.notes, m: c.cardMemo, g: (c.tags || []).join(" "), l: (c.logs || []).map(x => x.t).join(" ") }).join(" ")); return words.some(w => blob.includes(w)); });
+        how.push(`낱말 검색: ${words.join(", ")}`);
+      } else return { text: "질문에서 회사, 직무, 태그, 기간을 찾지 못했습니다. 아래 예시처럼 물어보세요.", how: [], people: [] };
+    }
+    list.sort((a, b) => String(lastContact(b) || "").localeCompare(String(lastContact(a) || "")) || String(a.name).localeCompare(String(b.name), "ko"));
+    const count = list.length;
+    const text = count ? `${count}명을 찾았습니다.` + (/몇\s*명/.test(q) ? "" : count > 20 ? " 앞의 20명만 보여 드립니다." : "") : "조건에 맞는 사람이 없습니다.";
+    return { text, how, people: list.slice(0, 20) };
+  }
+
+  /* ---------- 화면 조각 ---------- */
+  function avatar(c) { return h("span", { class: "avatar", "aria-hidden": "true" }, String(c.name || c.company || "?").slice(0, 1)); }
+  function personRow(c) {
+    const l = lastContact(c);
+    return h("button", { class: "person", onclick: () => go("p-" + c.id) }, avatar(c),
+      h("span", { class: "who" },
+        h("span", { class: "name" }, c.name || "(이름 없음)"), " ",
+        h("span", { class: "sub" }, [c.company, c.dept, c.title].filter(Boolean).join(" · ")),
+        h("span", { class: "row", style: "margin-top:2px" },
+          (c.tags || []).map(t => h("span", { class: "tag" }, t)),
+          isDue(c) ? h("span", { class: "tag due" }, "연락할 때") : null,
+          h("span", { class: "sub" }, l ? `마지막 연락 ${l}` : "연락 기록 없음"))));
+  }
+  function header(title, sub) {
+    return [
+      h("div", { class: "bar" }, h("a", { class: "back", href: "../../" }, "← 공부방"), DB.sample ? h("span", { class: "tag" }, "샘플 데이터") : null),
+      h("div", null, h("h1", null, title), sub ? h("p", { class: "muted small" }, sub) : null),
+      h("nav", { class: "tabs", "aria-label": "Connect 메뉴" }, [["people", "사람"], ["ask", "묻기"], ["import", "가져오기"]].map(([r, l]) =>
+        h("button", { "aria-current": (S.route === r || (r === "people" && S.route === "person")) ? "page" : null, onclick: () => go(r) }, l))),
+      S.msg ? h("div", { class: "note bad", role: "alert" }, S.msg) : null
+    ];
+  }
+
+  function viewEmpty() {
+    return h("div", { class: "card" },
+      h("h3", null, "명함을 불러와 시작합니다"),
+      h("p", { class: "small" }, "리멤버 앱의 설정 → 명함 내보내기에서 엑셀 파일을 이메일로 받은 뒤, '가져오기' 탭에서 올리세요. 파일은 이 기기의 브라우저 안에서만 읽고 저장하며 어디로도 보내지 않습니다."),
+      h("div", { class: "row" },
+        h("button", { class: "btn", onclick: () => go("import") }, "명함 파일 가져오기"),
+        h("button", { class: "btn ghost", onclick: loadSample }, "샘플로 둘러보기")));
+  }
+
+  function viewPeople() {
+    const all = DB.contacts;
+    if (!all.length) return [header("Connect", "명함 속 사람과 관계를 한곳에서"), viewEmpty()];
+    const qn = norm(S.q);
+    let list = all.filter(c => !qn || norm([c.name, c.company, c.dept, c.title, (c.tags || []).join(" "), c.email].join(" ")).includes(qn));
+    if (S.filter === "due") list = list.filter(isDue);
+    else if (S.filter === "cold") list = list.filter(c => { const l = lastContact(c); return !l || daysBetween(l, today()) >= 90; });
+    else if (S.filter.startsWith("tag:")) list = list.filter(c => (c.tags || []).includes(S.filter.slice(4)));
+    const tags = [...new Set(all.flatMap(c => c.tags || []))].sort();
+    const due = all.filter(isDue).length;
+    // 회사별로 묶는다
+    const groups = new Map();
+    for (const c of list.sort((a, b) => String(a.company || "~").localeCompare(String(b.company || "~"), "ko") || String(a.name).localeCompare(String(b.name), "ko"))) {
+      const k = c.company || "회사 없음"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c);
+    }
+    const listEl = h("div", { class: "stack", id: "plist" },
+      list.length ? [...groups].slice(0, 80).map(([co, ps]) => h("section", { class: "stack", style: "gap:6px" }, h("h3", null, `${co} `, h("span", { class: "muted small" }, `${ps.length}명`)), ps.map(personRow)))
+        : h("p", { class: "muted" }, "조건에 맞는 사람이 없습니다."),
+      groups.size > 80 ? h("p", { class: "muted small" }, "회사가 많아 앞의 80곳만 보여 드립니다. 검색으로 좁혀 보세요.") : null);
+    return [header("Connect", `${all.length}명 · ${new Set(all.map(c => c.company).filter(Boolean)).size}개 회사` + (due ? ` · 연락할 사람 ${due}명` : "")),
+      h("input", { type: "search", placeholder: "이름, 회사, 직책, 태그로 찾기", "aria-label": "사람 찾기", value: S.q, oninput: e => { S.q = e.target.value; const y = scrollY; render(); scrollTo(0, y); document.querySelector('input[type="search"]')?.focus(); } }),
+      h("div", { class: "chips", role: "group", "aria-label": "걸러 보기" },
+        [["all", "전체"], ["due", `연락할 때 ${due}`], ["cold", "90일 넘게 연락 없음"], ...tags.map(t => ["tag:" + t, "#" + t])].map(([k, l]) =>
+          h("button", { class: "chip", "aria-pressed": String(S.filter === k), onclick: () => { S.filter = k; render(); } }, l))),
+      listEl];
+  }
+
+  function viewPerson() {
+    const c = byId(S.pid);
+    if (!c) return [header("Connect"), h("p", { class: "muted" }, "이 사람을 찾을 수 없습니다.")];
+    const tel = v => v ? h("a", { href: "tel:" + v.replace(/[^\d+]/g, "") }, v) : null;
+    const field = (label, v) => v ? [h("dt", null, label), h("dd", null, v)] : null;
+    const l = lastContact(c);
+    const saveC = () => { c.updatedAt = new Date().toISOString(); save(); };
+    let logDate = today(), logText = "";
+    return [header(c.name || "(이름 없음)", [c.company, c.dept, c.title].filter(Boolean).join(" · ")),
+      h("div", { class: "card" },
+        h("div", { class: "row" }, c.mobile ? h("a", { class: "btn", href: "tel:" + c.mobile.replace(/[^\d+]/g, "") }, "전화") : null,
+          c.mobile ? h("a", { class: "btn ghost", href: "sms:" + c.mobile.replace(/[^\d+]/g, "") }, "문자") : null,
+          c.email ? h("a", { class: "btn ghost", href: "mailto:" + c.email }, "메일") : null),
+        h("dl", null, field("휴대폰", tel(c.mobile)), field("전화", tel(c.phone)), field("이메일", c.email), field("주소", c.address),
+          field("웹", c.website), field("그룹", c.group), field("명함 등록", c.registeredAt), field("명함 메모", c.cardMemo),
+          field("마지막 연락", l ? `${l} (${daysBetween(l, today())}일 전)` : "기록 없음"))),
+      h("section", { class: "card" },
+        h("h3", null, "태그와 다음 연락"),
+        h("label", { class: "small muted", for: "tags" }, "태그 (쉼표로 구분, 예: 고객사, 의사결정자)"),
+        h("input", { id: "tags", value: (c.tags || []).join(", "), onchange: e => { c.tags = [...new Set(e.target.value.split(",").map(s => s.trim().replace(/^#/, "")).filter(Boolean))]; saveC(); render(); } }),
+        h("label", { class: "small muted", for: "next" }, "다음 연락 예정일"),
+        h("input", { id: "next", type: "date", value: c.nextAt || "", onchange: e => { c.nextAt = e.target.value; saveC(); render(); } })),
+      h("section", { class: "card" },
+        h("h3", null, "만남과 대화 기록"),
+        h("form", { class: "stack", onsubmit: e => {
+          e.preventDefault(); if (!logText.trim()) return;
+          c.logs = [...(c.logs || []), { d: logDate, t: logText.trim() }]; saveC(); render();
+        } },
+          h("input", { type: "date", "aria-label": "날짜", value: logDate, onchange: e => { logDate = e.target.value || today(); } }),
+          h("textarea", { "aria-label": "무슨 이야기를 했나요", placeholder: "무슨 이야기를 했나요? 다음에 챙길 것은?", oninput: e => { logText = e.target.value; } }),
+          h("button", { class: "btn", type: "submit" }, "기록 남기기")),
+        (c.logs || []).slice().sort((a, b) => b.d.localeCompare(a.d)).map((g, i) => h("div", { class: "log" }, h("time", null, g.d), h("p", null, g.t),
+          h("button", { class: "back small", onclick: () => { c.logs = c.logs.filter(x => x !== g); saveC(); render(); } }, "지우기")))),
+      h("section", { class: "card" },
+        h("h3", null, "메모"),
+        h("textarea", { "aria-label": "메모", value: c.notes || "", placeholder: "관심사, 소개해 준 사람, 주의할 점 등", onchange: e => { c.notes = e.target.value; saveC(); } })),
+      h("button", { class: "btn danger", onclick: () => { if (confirm(`${c.name}님을 지울까요? 기록도 함께 지워집니다.`)) { DB.contacts = DB.contacts.filter(x => x !== c); save(); go("people"); } } }, "이 사람 지우기")];
+  }
+
+  const EXAMPLES = ["재무 쪽 아는 사람", "가온테크 사람 누구 있어?", "3개월 넘게 연락 안 한 고객사", "이번 주 연락할 사람", "최근 한 달 만난 사람", "임원 몇 명이야?"];
+  function viewAsk() {
+    const send = q => { if (!q.trim()) return; S.chat.push({ me: q }, { bot: answer(q) }); S.ask = ""; render(); setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0); };
+    const ex = DB.sample ? EXAMPLES : EXAMPLES.filter(x => !x.includes("가온테크"));
+    return [header("묻기", "이 기기 안의 명함과 기록만 보고 답합니다. 질문은 어디로도 보내지 않습니다."),
+      !DB.contacts.length ? viewEmpty() : null,
+      h("div", { class: "stack" }, S.chat.map(m => m.me ? h("div", { class: "msg me" }, m.me) : botMsg(m.bot))),
+      h("div", { class: "chips" }, ex.map(x => h("button", { class: "chip", onclick: () => send(x) }, x))),
+      h("form", { class: "row", onsubmit: e => { e.preventDefault(); send(S.ask); } },
+        h("input", { style: "flex:1", placeholder: "예: 누리바이오 재무 담당은?", "aria-label": "질문", value: S.ask, oninput: e => { S.ask = e.target.value; } }),
+        h("button", { class: "btn", type: "submit" }, "묻기")),
+      S.chat.length ? h("button", { class: "back small", onclick: () => { S.chat = []; render(); } }, "대화 지우기") : null,
+      h("p", { class: "muted small" }, "알아듣는 것: 회사 이름, 직무(재무·영업·IT·인사·구매·법무·생산·기획·임원), 태그, 기간(3개월 넘게 연락 안 한, 최근 한 달, 이번 주 연락할), 사람 이름. 그 밖에는 낱말로 찾습니다.")];
+  }
+  function botMsg(a) {
+    if (a.profile) {
+      const c = a.profile, l = lastContact(c), recent = (c.logs || []).slice().sort((x, y) => y.d.localeCompare(x.d)).slice(0, 3);
+      return h("div", { class: "msg bot stack" },
+        h("p", null, h("strong", null, c.name), ` 님은 ${[c.company, c.dept, c.title].filter(Boolean).join(" ") || "회사 정보가 없는 분"}입니다.`),
+        h("p", { class: "small" }, l ? `마지막 연락은 ${l}(${daysBetween(l, today())}일 전)입니다.` : "아직 연락 기록이 없습니다.", c.nextAt ? ` 다음 연락 예정일은 ${c.nextAt}입니다.` : ""),
+        (c.tags || []).length ? h("p", { class: "small" }, "태그: ", c.tags.map(t => h("span", { class: "tag" }, t))) : null,
+        recent.length ? h("div", { class: "stack", style: "gap:4px" }, recent.map(g => h("div", { class: "log" }, h("time", null, g.d), h("p", { class: "small" }, g.t)))) : null,
+        c.notes ? h("p", { class: "small" }, "메모: " + c.notes) : null,
+        h("button", { class: "btn ghost", onclick: () => go("p-" + c.id) }, "자세히 보기"));
+    }
+    return h("div", { class: "msg bot stack" },
+      a.text ? h("p", null, a.text) : null,
+      a.how.length ? h("p", { class: "how" }, "이렇게 이해했어요: " + a.how.join(" · ")) : null,
+      a.people.map(personRow));
+  }
+
+  function viewImport() {
+    const st = S.importState;
+    const pick = h("input", { type: "file", accept: ".xls,.xlsx,.csv,.txt", "aria-label": "명함 파일", onchange: async e => {
+      const f = e.target.files[0]; if (!f) return;
+      S.importState = { loading: true, file: f.name }; render();
+      try {
+        const { headers, rows } = await readRows(f);
+        if (!headers.length || !rows.length) throw new Error("파일에서 표를 찾지 못했습니다.");
+        S.importState = { file: f.name, headers, rows, map: guessMap(headers) };
+      } catch (err) { S.importState = { error: err.message || "파일을 읽지 못했습니다." }; }
+      render();
+    } });
+    const out = [header("가져오기", "리멤버에서 내보낸 엑셀(XLS·XLSX)이나 CSV를 올립니다."),
+      h("div", { class: "note" }, "파일은 이 기기의 브라우저 안에서만 읽고 저장합니다. 서버나 저장소로 보내지 않습니다. 같은 사람(이메일·휴대폰·이름+회사가 같은 사람)을 다시 가져오면 명함 정보만 새로 고치고, 태그·기록·메모는 그대로 둡니다."),
+      h("div", { class: "card" }, h("h3", null, "1. 리멤버에서 파일 받기"),
+        h("p", { class: "small" }, "리멤버 앱 → 설정 → 명함 내보내기 → 전체 선택 → 엑셀 파일 받기 → 받은 메일의 첨부 파일을 이 기기에 저장합니다. 메뉴 이름은 앱 버전에 따라 조금 다를 수 있습니다.")),
+      h("div", { class: "card" }, h("h3", null, "2. 파일 고르기"), pick,
+        st?.loading ? h("p", { class: "muted small" }, `${st.file} 읽는 중…`) : null,
+        st?.error ? h("div", { class: "note bad" }, st.error + " 엑셀에서 열어 CSV(UTF-8)로 다시 저장한 뒤 올려 보세요.") : null)];
+    if (st?.headers) {
+      const preview = rowsToContacts(st.headers, st.rows, st.map);
+      out.push(h("div", { class: "card" },
+        h("h3", null, "3. 칸 맞추기"),
+        h("p", { class: "small" }, `${st.file}: ${st.rows.length}줄. 머리글을 보고 칸 뜻을 짐작했습니다. 틀린 칸은 고쳐 주세요.`),
+        h("div", { class: "map" }, st.headers.map((hd, i) => [h("span", null, hd || `(${i + 1}번째 칸)`),
+          h("select", { "aria-label": `${hd} 칸의 뜻`, onchange: e => { st.map[i] = e.target.value; render(); } },
+            [["skip", "가져오지 않음"], ...FIELDS].map(([v, l]) => h("option", { value: v, selected: st.map[i] === v ? true : null }, l)))])),
+        h("p", { class: "small muted" }, "미리 보기 (앞의 3명)"),
+        h("div", { class: "tablewrap" }, h("table", null,
+          h("thead", null, h("tr", null, ["이름", "회사", "부서", "직책", "휴대폰", "이메일"].map(x => h("th", null, x)))),
+          h("tbody", null, preview.slice(0, 3).map(c => h("tr", null, [c.name, c.company, c.dept, c.title, c.mobile, c.email].map(v => h("td", null, v || ""))))))),
+        h("button", { class: "btn", disabled: !preview.length || !st.map.includes("name") && !st.map.includes("lastName"), onclick: () => {
+          const r = mergeContacts(preview);
+          if (save()) { S.importState = null; S.msg = ""; S.flash = `새로 ${r.added}명, 갱신 ${r.updated}명을 가져왔습니다.`; go("import"); }
+        } }, `${preview.length}명 가져오기`)));
+    }
+    if (S.flash) out.push(h("div", { class: "note good", role: "status" }, S.flash));
+    out.push(h("div", { class: "card" }, h("h3", null, "백업과 지우기"),
+      h("p", { class: "small" }, "기록은 이 브라우저에만 있습니다. 브라우저 데이터를 지우면 사라지니 가끔 백업 파일로 저장하세요. 다른 기기로 옮길 때도 씁니다. 백업 파일에는 연락처가 들어 있으니 안전한 곳에 두세요."),
+      h("div", { class: "row" },
+        h("button", { class: "btn ghost", disabled: !DB.contacts.length, onclick: () => {
+          const url = URL.createObjectURL(new Blob([JSON.stringify({ app: "connect", ...DB, exportedAt: new Date().toISOString() }, null, 1)], { type: "application/json" }));
+          const a = h("a", { href: url, download: `connect-백업-${today()}.json` }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+        } }, "백업 파일 저장"),
+        h("label", { class: "btn ghost", for: "restore" }, "백업 불러오기"),
+        h("input", { id: "restore", type: "file", accept: ".json,application/json", hidden: true, onchange: async e => {
+          try { const d = JSON.parse(await e.target.files[0].text()); if (d.app !== "connect" || !Array.isArray(d.contacts)) throw 0; DB = { version: 1, contacts: d.contacts, importedAt: d.importedAt, sample: !!d.sample }; save(); S.flash = `백업에서 ${d.contacts.length}명을 불러왔습니다.`; render(); }
+          catch { S.flash = ""; S.msg = "Connect 백업 파일이 아닙니다."; render(); }
+        } }),
+        h("button", { class: "btn danger", disabled: !DB.contacts.length, onclick: () => { if (confirm("이 기기에 저장된 명함과 기록을 모두 지울까요? 되돌릴 수 없습니다.")) { DB = { version: 1, contacts: [], importedAt: null, sample: false }; save(); S.flash = "모두 지웠습니다."; render(); } } }, "모두 지우기")),
+      !DB.contacts.length ? h("button", { class: "btn ghost", onclick: loadSample }, "샘플로 둘러보기") : null));
+    return out;
+  }
+
+  function render() {
+    const view = S.route === "person" ? viewPerson() : S.route === "ask" ? viewAsk() : S.route === "import" ? viewImport() : viewPeople();
+    app.replaceChildren(...[view].flat(Infinity).filter(Boolean));
+    if (S.route !== "import") S.flash = "";
+  }
+
+  load();
+  Object.assign(S, parseHash());
+  render();
+})();
+</script>
+</body>
+</html>

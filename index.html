@@ -97,12 +97,23 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
   };
   const svg = markup => { const t = document.createElement("template"); t.innerHTML = markup.trim(); return t.content.firstChild; };
   const ICONS = {
+    people: '<svg class="icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="17" cy="17" r="8" fill="var(--accent)"/><circle cx="33" cy="17" r="7" fill="none" stroke="var(--accent)" stroke-width="3"/><path d="M3 42c1.5-8 7-12 14-12s12.5 4 14 12z" fill="var(--accent)"/><path d="M30 31c6 0 12 3 14 11" fill="none" stroke="var(--accent)" stroke-width="3"/></svg>',
     cells: '<svg class="icon" viewBox="0 0 48 48" aria-hidden="true"><path fill="var(--accent)" d="M4 4h18v18H4zM26 4h18v18H26zM4 26h18v18H4z"/><path fill="none" stroke="var(--accent)" stroke-width="3" d="M27.5 27.5h15v15h-15z"/></svg>'
   };
   const letterIcon = name => svg(`<svg class="icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="8" fill="none" stroke="var(--accent)" stroke-width="3"/><text x="24" y="31" text-anchor="middle" font-size="20" fill="var(--accent)" font-family="sans-serif">${String(name || "?").slice(0, 1).replace(/[<&>"]/g, "")}</text></svg>`);
 
   /* 앱별 짧은 현황. 앱이 브라우저에 남긴 기록을 읽기만 한다. */
   const SUMMARY = {
+    connect() {
+      try {
+        const d = JSON.parse(localStorage.getItem("connect-data-v1") || "null");
+        const list = d?.contacts || [];
+        if (!list.length) return "아직 불러온 명함이 없습니다";
+        const t = new Date().toISOString().slice(0, 10);
+        const due = list.filter(c => c.nextAt && c.nextAt <= t).length;
+        return `${d.sample ? "샘플 " : ""}${list.length}명 · 회사 ${new Set(list.map(c => c.company).filter(Boolean)).size}곳` + (due ? ` · 연락할 사람 ${due}명` : "");
+      } catch { return null; }
+    },
     nekan() {
       try {
         const progress = JSON.parse(localStorage.getItem("nekan-progress-v1") || "{}");

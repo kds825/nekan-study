@@ -12,6 +12,15 @@
       "icon": "cells",
       "status": "live",
       "addedAt": "2026-11-01"
+    },
+    {
+      "id": "connect",
+      "name": "Connect",
+      "description": "리멤버에서 내보낸 명함을 이 기기 안에서만 정리하고, 회사·직무·연락 시점으로 사람을 묻고 찾습니다.",
+      "path": "apps/connect/",
+      "icon": "people",
+      "status": "live",
+      "addedAt": "2026-11-11"
     }
   ]
 }
