@@ -16,7 +16,7 @@
     {
       "id": "connect",
       "name": "Connect",
-      "description": "명함과 직접 넣은 지식을 이 기기 안에서만 검색해 답합니다. 시연용(공개 지식만, 개인정보 가림)과 개인용 두 모드.",
+      "description": "명함과 직접 넣은 지식을 이 기기 안에서만 다룹니다. 이름을 치면 기본정보, 질문하면 지식과 기록을 찾아 답합니다.",
       "path": "apps/connect/",
       "icon": "people",
       "status": "live",
