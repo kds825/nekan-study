@@ -16,7 +16,7 @@
     {
       "id": "connect",
       "name": "Connect",
-      "description": "리멤버에서 내보낸 명함을 이 기기 안에서만 정리하고, 회사·직무·연락 시점으로 사람을 묻고 찾습니다.",
+      "description": "명함과 직접 넣은 지식을 이 기기 안에서만 검색해 답합니다. 시연용(공개 지식만, 개인정보 가림)과 개인용 두 모드.",
       "path": "apps/connect/",
       "icon": "people",
       "status": "live",
