@@ -1,7 +1,7 @@
 // 토픽 파일의 형식을 검사한다. 실행: node scripts/check-topics.mjs
 import { readFileSync, readdirSync } from "node:fs";
 
-const dir = new URL("../topics/", import.meta.url);
+const dir = new URL("../apps/nekan/topics/", import.meta.url);
 const read = name => JSON.parse(readFileSync(new URL(name, dir), "utf8"));
 const errors = [];
 const need = (ok, message) => { if (!ok) errors.push(message); };

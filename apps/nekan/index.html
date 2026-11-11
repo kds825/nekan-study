@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>네칸 공부</title>
+<meta name="description" content="짧은 이론과 바로 푸는 문제로 익히고, 종합문제·실습·응용으로 마무리합니다.">
+<meta name="theme-color" content="#0d6b66">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%230d6b66' d='M3 3h12v12H3zM17 3h12v12H17zM3 17h12v12H3z'/%3E%3Cpath fill='none' stroke='%230d6b66' stroke-width='2' d='M18 18h10v10H18z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 모눈종이 위 한 줄 단. 시나리오마다 학습(이론 사이사이 문제)과 종합(문제·실습·응용) 두 화면을 오가고, 진행은 네 칸으로 표시한다. 폰에서는 엄지 닿는 하단 레일로 이동한다. */
+:root {
+  color-scheme: light dark;
+  --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
+  --accent: #0d6b66; --accent-ink: #ffffff; --mark: #ffe45c; --mark-fg: #16282b;
+  --good: #17693f; --good-bg: #e2f4e9; --bad: #a93127; --bad-bg: #fbe9e6;
+  --display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #10191b; --grid: #162225; --fg: #e6eeec; --muted: #9db0ae; --surface: #18262a; --line: #2f4346;
+  --accent: #4fc4ba; --accent-ink: #08201f; --mark: #5c5000; --mark-fg: #fff4b0;
+  --good: #6ad698; --good-bg: #12301f; --bad: #ff9c8f; --bad-bg: #3a1a16;
+} }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0;
+  background-color: var(--bg); color: var(--fg); font: 400 16px/1.7 var(--body); word-break: keep-all; overflow-wrap: anywhere;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#app { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
+#app.learning { padding-block-end: 112px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.25; margin: 0; text-wrap: balance; }
+h1 { font-size: 2rem; } h2 { font-size: 1.5rem; } h3 { font-size: 1.2rem; }
+p { margin: 0; }
+mark { background: var(--mark); color: var(--mark-fg); padding: 0 .15em; border-radius: 2px; font-weight: 500; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.stack-l { display: flex; flex-direction: column; gap: 28px; }
+.muted { color: var(--muted); }
+.small { font-size: .875rem; line-height: 1.55; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.brand { display: flex; gap: 12px; align-items: center; }
+
+.cells { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; flex: none; width: 34px; height: 34px; }
+.cells i { background: var(--surface); border: 1.5px solid var(--accent); border-radius: 2px; }
+.cells i.on { background: var(--accent); }
+.cells.big { width: 44px; height: 44px; }
+
+.btn { min-height: 46px; padding: 8px 18px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn[disabled] { opacity: .55; cursor: default; }
+.btn.wide { width: 100%; }
+.back { background: none; border: 0; padding: 6px 0; color: var(--accent); font-weight: 500; min-height: 44px; text-align: left; }
+a.back { display: inline-flex; align-items: center; align-self: flex-start; text-decoration: none; }
+
+.entry { display: flex; gap: 14px; align-items: flex-start; width: 100%; text-align: left; padding: 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; }
+.entry:hover { border-color: var(--accent); }
+.entry > div:last-child { min-width: 0; flex: 1; }
+.tag { font-size: .8rem; letter-spacing: .02em; color: var(--muted); }
+.continue { border-color: var(--accent); }
+
+.situation { padding: 14px 16px; background: var(--surface); border: 1.5px dashed var(--accent); border-radius: 8px; }
+.formula { font-family: var(--mono); font-size: .95rem; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; white-space: pre; line-height: 1.6; word-break: normal; overflow-wrap: normal; }
+.callout { padding: 12px 14px; background: var(--surface); border-left: 4px solid var(--mark); }
+ul.clean { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; background: var(--surface); font-variant-numeric: tabular-nums; word-break: normal; }
+th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; white-space: nowrap; }
+th { font-weight: 500; color: var(--muted); }
+
+.card { padding: 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 12px; }
+.card.ok { border-color: var(--good); }
+.opt { display: block; width: 100%; text-align: left; min-height: 48px; padding: 11px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 6px; }
+.opt:not([disabled]):hover { border-color: var(--accent); }
+.opt[disabled] { cursor: default; color: var(--fg); opacity: 1; }
+.opt.right { background: var(--good-bg); border-color: var(--good); }
+.opt.wrong { background: var(--bad-bg); border-color: var(--bad); }
+.verdict { font-weight: 700; }
+.verdict.good { color: var(--good); } .verdict.bad { color: var(--bad); }
+.meter { font-family: var(--mono); color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+
+.field { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+input[type=text], textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+input[type=text] { flex: 1 1 140px; min-width: 0; min-height: 46px; }
+textarea { width: 100%; min-height: 170px; resize: vertical; }
+.chips { display: flex; flex-direction: column; gap: 6px; }
+.chip { min-height: 44px; padding: 8px 12px; text-align: left; border-radius: 6px; border: 1.5px solid var(--line); background: var(--bg); width: 100%; }
+.chip.placed { border-color: var(--accent); background: var(--surface); }
+.chip[disabled] { color: var(--fg); opacity: 1; cursor: default; }
+.chip .n { font-family: var(--mono); color: var(--accent); margin-right: 8px; }
+.solution { padding: 12px 14px; background: var(--bg); border-radius: 6px; white-space: pre-wrap; }
+[hidden] { display: none !important; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.tool { min-height: 40px; padding: 4px 12px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 500; font-size: .9rem; }
+.tool:hover { border-color: var(--accent); }
+.tool[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lv { display: inline-block; padding: 1px 8px; border-radius: 4px; border: 1.5px solid var(--accent); color: var(--accent); font-size: .78rem; font-weight: 700; }
+.lv.l1 { border-color: var(--line); color: var(--muted); }
+.lv.l3 { background: var(--accent); color: var(--accent-ink); }
+.levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.level-row { padding: 10px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; font-variant-numeric: tabular-nums; }
+.source { background: none; border: 0; padding: 0; color: var(--accent); font-size: .82rem; text-align: left; min-height: 32px; }
+.note-text { white-space: pre-wrap; }
+.search { width: 100%; }
+#selbar { position: fixed; left: 50%; transform: translateX(-50%); z-index: 6; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 4px 16px rgba(0, 0, 0, .28); white-space: nowrap; }
+#selbar.above-rail { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); z-index: 7; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding: 10px 16px; border-radius: 6px; background: var(--fg); color: var(--bg); font-size: .9rem; max-width: calc(100vw - 32px); }
+#toast.above-rail { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.explain { white-space: pre-line; }
+.answer-key { font-weight: 700; }
+.answer-key ol { margin: 4px 0 0; padding-left: 1.3em; font-weight: 500; white-space: normal; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.prompt-box { min-height: 120px; font-size: .9rem; }
+.note { padding: 10px 14px; border-radius: 6px; background: var(--bad-bg); color: var(--bad); font-size: .9rem; }
+.score { font-family: var(--display); font-size: 2.4rem; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.rail { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: 1.5px solid var(--line);
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.rail div { max-width: 608px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.rail button { min-height: 52px; border-radius: 6px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); font-family: var(--display); font-size: 1.05rem; line-height: 1.1; padding: 4px; }
+.rail button.done { background: var(--good-bg); border-color: var(--good); color: var(--good); }
+.rail button[aria-current="step"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rail small { display: block; font: 500 .68rem/1.3 var(--mono); }
+.check { border-left: 4px solid var(--accent); }
+.secs { display: flex; flex-wrap: wrap; gap: 6px; }
+.sec { font: 500 .78rem/1.4 var(--body); color: var(--accent); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; }
+.part { padding-top: 12px; border-top: 1.5px solid var(--line); }
+/* 계산기: 학습 화면 오른쪽 아래 버튼으로 열고, 화면 아래에서 올라오는 판으로 쓴다 */
+#calc-fab { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 6;
+  min-height: 48px; padding: 6px 16px; border-radius: 24px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--accent); font-weight: 700; box-shadow: 0 4px 14px rgba(0, 0, 0, .2); }
+#calc { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--surface); border-top: 1.5px solid var(--line); box-shadow: 0 -6px 24px rgba(0, 0, 0, .22);
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+#calc > div { max-width: 608px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.calc-screen { padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--bg); font-family: var(--mono); text-align: right; min-height: 64px; }
+.calc-expr { font-size: 1.05rem; word-break: break-all; min-height: 1.5em; }
+.calc-out { font-size: 1.5rem; color: var(--accent); font-variant-numeric: tabular-nums; word-break: break-all; min-height: 1.4em; }
+.calc-out.err { color: var(--bad); font-size: 1rem; }
+.calc-keys { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.calc-keys button { min-height: 46px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font: 500 1.1rem var(--mono); padding: 0; }
+.calc-keys button.op { color: var(--accent); border-color: var(--accent); }
+.calc-keys button.eq { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.calc-hist { display: flex; gap: 6px; overflow-x: auto; font: .8rem var(--mono); }
+.calc-hist button { flex: none; min-height: 32px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<button id="selbar" class="btn" type="button" hidden>선택한 내용 노트에 넣기</button>
+<div id="toast" role="status" hidden></div>
+<button id="calc-fab" type="button" hidden aria-haspopup="dialog">계산기</button>
+<div id="calc" role="dialog" aria-label="계산기" hidden></div>
+<noscript>이 사이트를 쓰려면 JavaScript를 켜 주세요.</noscript>
+
+<script>
+(() => {
+  /* 진행 칸은 네 개(학습, 종합문제, 실습, 응용)이고, 화면은 학습과 종합 두 개다. */
+  const STAGES = [["theory", "학습"], ["quiz", "종합문제"], ["practice", "실습"], ["apply", "응용"]];
+  const TABS = [["learn", "학습"], ["final", "종합"]];
+  const tabOf = x => x === "theory" || x === "learn" ? "learn" : "final";
+  const STORE_KEY = "nekan-progress-v1";
+  const NOTE_KEY = "nekan-notes-v1";
+  const LEVELS = { 1: "기초", 2: "응용", 3: "심화" };
+  const levelOf = q => LEVELS[q.level] ? q.level : 2;
+  const app = document.getElementById("app");
+  const S = {
+    topics: [], loadState: "loading", failedTopics: 0, progress: {}, saveError: "",
+    route: { name: "home" }, stage: "learn", drafts: {}, orderDraft: {}, moreOpen: {}, moreLevel: {}, copied: "",
+    notes: [], noteDraft: "", noteQuery: "", editNote: null, editDraft: "", confirmDelete: null, backupMsg: "",
+    wrongTab: "open", review: {}, peek: {}, prevRoute: null, prevStage: null
+  };
+
+  /* ---------- 작은 유틸 ---------- */
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "value") el.value = v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat(Infinity)) if (c !== null && c !== undefined && c !== false) el.append(c);
+    return el;
+  }
+  function rich(text) {
+    return String(text ?? "").split(/\*\*(.+?)\*\*/g).map((s, i) => i % 2 ? h("mark", null, s) : s);
+  }
+  const ls = {
+    get(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
+    set(k, v) { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); return true; } catch { return false; } }
+  };
+  const keyOf = (t, s) => t + "--" + s;
+  const findTopic = id => S.topics.find(t => t.id === id);
+  const findScenario = (t, id) => (t?.scenarios || []).find(s => s.id === id);
+
+  /* ---------- 진행 기록: 이 브라우저에 저장 ---------- */
+  function loadProgress() {
+    try {
+      const parsed = JSON.parse(ls.get(STORE_KEY) || "{}");
+      if (parsed && typeof parsed === "object") S.progress = parsed;
+    } catch { S.progress = {}; }
+  }
+  function prog(tid, sid) {
+    const k = keyOf(tid, sid);
+    if (!S.progress[k]) S.progress[k] = { topicId: tid, scenarioId: sid };
+    const p = S.progress[k];
+    p.theory ||= {}; p.quiz ||= { answers: {}, wrongEver: [] }; p.practice ||= { items: {} }; p.apply ||= {};
+    p.quiz.answers ||= {}; p.quiz.wrongEver ||= []; p.quiz.wrongChoice ||= {}; p.quiz.reviewed ||= {};
+    p.practice.items ||= {}; p.practice.missed ||= []; p.practice.reviewed ||= {};
+    return p;
+  }
+  const cellsOf = p => STAGES.map(([s]) => !!p?.[s]?.done);
+  function save(tid, sid) {
+    S.progress[keyOf(tid, sid)].updatedAt = new Date().toISOString();
+    const ok = ls.set(STORE_KEY, JSON.stringify(S.progress));
+    const message = ok ? "" : "이 브라우저에 진행 기록을 저장하지 못했습니다. 시크릿 모드라면 일반 창에서 열어 주세요.";
+    if (message !== S.saveError) { S.saveError = message; rerender(); }
+  }
+
+  /* ---------- 노트: 이 브라우저에 저장 ---------- */
+  function loadNotes() {
+    try {
+      const parsed = JSON.parse(ls.get(NOTE_KEY) || "[]");
+      if (Array.isArray(parsed)) S.notes = parsed;
+    } catch { S.notes = []; }
+  }
+  function saveNotes() {
+    const ok = ls.set(NOTE_KEY, S.notes.length ? JSON.stringify(S.notes) : "");
+    S.saveError = ok ? "" : "이 브라우저에 노트를 저장하지 못했습니다. 시크릿 모드라면 일반 창에서 열어 주세요.";
+    return ok;
+  }
+  function addNote(text, source) {
+    S.notes.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), text, source: source || null, createdAt: new Date().toISOString() });
+    return saveNotes();
+  }
+  function currentSource() {
+    const r = S.route;
+    if (r.name === "learn") {
+      const t = findTopic(r.tid), s = findScenario(t, r.sid);
+      const stage = (TABS.find(([k]) => k === S.stage) || [])[1];
+      if (s) return { tid: t.id, sid: s.id, label: `${t.title} · ${s.title} · ${stage}` };
+    }
+    if (r.name === "topic" && findTopic(r.tid)) return { tid: r.tid, label: findTopic(r.tid).title };
+    if (r.name === "wrong") return { label: "오답노트" };
+    return null;
+  }
+  let toastTimer;
+  function toast(message) {
+    const el = document.getElementById("toast");
+    el.textContent = message;
+    el.classList.toggle("above-rail", app.classList.contains("learning"));
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+  }
+
+  /* 드래그한 글을 노트에 넣기. 폰에서 버튼을 누르는 순간 선택이 풀려도 쓸 수 있게 글을 잠시 보관한다. */
+  function initSelectionBar() {
+    const bar = document.getElementById("selbar");
+    let picked = "", hideTimer;
+    document.addEventListener("selectionchange", () => {
+      const sel = window.getSelection();
+      const text = sel && !sel.isCollapsed ? sel.toString().trim() : "";
+      const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
+      if (text && !typing && S.route.name !== "notes" && sel.anchorNode && app.contains(sel.anchorNode)) {
+        clearTimeout(hideTimer);
+        picked = text;
+        bar.classList.toggle("above-rail", app.classList.contains("learning"));
+        bar.hidden = false;
+      } else if (!bar.hidden) {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { bar.hidden = true; picked = ""; }, 500);
+      }
+    });
+    bar.addEventListener("pointerdown", e => e.preventDefault());
+    bar.addEventListener("click", () => {
+      if (!picked) return;
+      const ok = addNote(picked, currentSource());
+      clearTimeout(hideTimer);
+      picked = "";
+      bar.hidden = true;
+      window.getSelection()?.removeAllRanges();
+      toast(ok ? "노트에 넣었어요" : "저장하지 못했습니다. 시크릿 모드인지 확인해 주세요.");
+      if (S.route.name === "home" || S.route.name === "wrong") rerender();
+      else refreshToolLinks();
+    });
+  }
+
+  /* ---------- 라우팅 ---------- */
+  function parseHash() {
+    const raw = location.hash.slice(1);
+    if (raw === "wrong" || raw === "notes") return { name: raw };
+    if (raw.startsWith("topic-")) return { name: "topic", tid: raw.slice(6) };
+    if (raw.startsWith("learn-")) {
+      const [tid, sid] = raw.slice(6).split("--");
+      if (tid && sid) return { name: "learn", tid, sid };
+    }
+    return { name: "home" };
+  }
+  function hashOf(r) {
+    if (r.name === "wrong" || r.name === "notes") return "#" + r.name;
+    if (r.name === "topic") return "#topic-" + r.tid;
+    if (r.name === "learn") return "#learn-" + r.tid + "--" + r.sid;
+    return location.pathname + location.search;
+  }
+  function enter(r) {
+    const fromTool = S.route.name === "wrong" || S.route.name === "notes";
+    S.route = r;
+    if (r.name === "learn" && findScenario(findTopic(r.tid), r.sid)) {
+      const p = prog(r.tid, r.sid);
+      S.stage = p.theory.done ? "final" : "learn";
+      if (!fromTool) freshStart(r.tid, r.sid, p);
+    }
+    render(); window.scrollTo(0, 0);
+  }
+  /* 시나리오에 새로 들어오면 고른 답과 실습 입력을 비워 처음부터 다시 풀게 한다.
+     칸 완료 표시와 오답노트(wrongEver, wrongChoice, missed, reviewed)는 그대로 둔다.
+     오답노트나 노트에 잠깐 갔다 돌아올 때는 비우지 않는다. */
+  function freshStart(tid, sid, p) {
+    const k = keyOf(tid, sid);
+    if (!Object.keys(p.quiz.answers).length && !Object.keys(p.practice.items).length) return;
+    p.quiz.answers = {};
+    p.practice.items = {};
+    for (const m of [S.drafts, S.orderDraft]) for (const d of Object.keys(m)) if (d.startsWith(k + "/")) delete m[d];
+    save(tid, sid);
+  }
+  function go(r) {
+    const isTool = x => x.name === "wrong" || x.name === "notes";
+    if (isTool(r) && !isTool(S.route)) { S.prevRoute = S.route; S.prevStage = S.stage; }
+    history.pushState(null, "", hashOf(r));
+    enter(r);
+  }
+  function leaveTools() {
+    const r = S.prevRoute || { name: "home" }, stage = S.prevStage;
+    go(r);
+    if (r.name === "learn" && stage) setStage(stage);
+  }
+  window.addEventListener("popstate", () => enter(parseHash()));
+
+  function setStage(s) { S.stage = tabOf(s); render(); window.scrollTo(0, 0); }
+  function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
+
+  function render() {
+    const r = S.route;
+    const learning = r.name === "learn" && findScenario(findTopic(r.tid), r.sid);
+    app.className = learning ? "learning" : "";
+    calcVisible(!!learning);
+    const notes = S.saveError ? h("div", { class: "note", role: "alert" }, S.saveError) : null;
+    const view = learning ? viewLearn(findTopic(r.tid), learning)
+      : r.name === "wrong" ? viewWrong()
+      : r.name === "notes" ? viewNotes()
+      : r.name === "topic" && findTopic(r.tid) ? viewTopic(findTopic(r.tid))
+      : viewHome();
+    app.replaceChildren(h("div", { class: "stack-l" }, notes, view));
+  }
+
+  /* ---------- 오답노트와 노트로 가는 버튼 ---------- */
+  function toolLinks() {
+    return h("div", { class: "tools", id: "tool-links" },
+      h("button", { class: "tool", onclick: () => go({ name: "wrong" }) }, `오답노트 ${wrongEntries().filter(e => !e.reviewed).length}`),
+      h("button", { class: "tool", onclick: () => go({ name: "notes" }) }, `노트 ${S.notes.length}`));
+  }
+  function refreshToolLinks() { document.getElementById("tool-links")?.replaceWith(toolLinks()); }
+
+  /* ---------- 오답노트 ---------- */
+  function wrongEntries() {
+    const out = [];
+    for (const t of S.topics) for (const s of t.scenarios || []) {
+      if (!S.progress[keyOf(t.id, s.id)]) continue;
+      const p = prog(t.id, s.id);
+      for (const q of s.quiz || []) if (p.quiz.wrongEver.includes(q.id)) {
+        out.push({ kind: "quiz", t, s, p, q, key: `${keyOf(t.id, s.id)}/${q.id}`, reviewed: !!p.quiz.reviewed[q.id] });
+      }
+      for (const item of s.practice || []) {
+        const rec = p.practice.items[item.id];
+        const missed = p.practice.missed.includes(item.id) || (rec && (rec.revealed || (rec.tries > 0 && !rec.ok) || rec.tries > 1));
+        if (missed) out.push({ kind: "practice", t, s, p, item, key: `${keyOf(t.id, s.id)}/${item.id}`, reviewed: !!p.practice.reviewed[item.id] });
+      }
+    }
+    return out;
+  }
+  function openInLearn(e, stage) {
+    return h("button", { class: "source", onclick: () => { go({ name: "learn", tid: e.t.id, sid: e.s.id }); setStage(stage); } }, `${e.t.title} · ${e.s.title}`);
+  }
+  function viewWrong() {
+    if (S.loadState !== "ready") {
+      return h("div", { class: "stack" },
+        h("button", { class: "back", onclick: leaveTools }, "← 돌아가기"),
+        h("h1", null, "오답노트"),
+        S.loadState === "loading" ? h("p", { class: "muted" }, "문제를 불러오는 중입니다.")
+          : h("div", { class: "note", role: "alert" }, "문제를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로 고침해 주세요."));
+    }
+    const all = wrongEntries();
+    const open = all.filter(e => !e.reviewed), done = all.filter(e => e.reviewed);
+    // 방금 맞힌 문제는 해설을 읽을 수 있게 다음에 들어올 때까지 이 탭에 남겨 둔다.
+    const list = S.wrongTab === "open" ? all.filter(e => !e.reviewed || S.review[e.key] !== undefined) : done;
+    return h("div", { class: "stack-l" },
+      h("div", { class: "stack" },
+        h("button", { class: "back", onclick: leaveTools }, "← 돌아가기"),
+        h("h1", null, "오답노트"),
+        h("p", { class: "muted small" }, "처음에 틀렸거나 답을 먼저 본 문제가 모입니다. 다시 맞히면 복습 완료로 옮겨집니다."),
+        h("div", { class: "tools" },
+          h("button", { class: "tool", "aria-pressed": String(S.wrongTab === "open"), onclick: () => { S.wrongTab = "open"; rerender(); } }, `복습할 문제 ${open.length}`),
+          h("button", { class: "tool", "aria-pressed": String(S.wrongTab === "done"), onclick: () => { S.wrongTab = "done"; rerender(); } }, `복습 완료 ${done.length}`))),
+      list.length ? h("div", { class: "stack" }, list.map(e => e.kind === "quiz" ? wrongQuizCard(e) : wrongPracticeCard(e)))
+        : h("div", { class: "card" }, h("p", { class: "muted" }, S.wrongTab === "open"
+          ? "복습할 문제가 없습니다. 틀린 문제가 생기면 여기에 모입니다."
+          : "아직 복습을 마친 문제가 없습니다.")));
+  }
+  function wrongQuizCard(e) {
+    const { q, p } = e;
+    const chosen = S.review[e.key], peek = S.peek[e.key];
+    const answered = chosen !== undefined || peek;
+    const mine = p.quiz.wrongChoice[q.id];
+    const pick = i => {
+      S.review[e.key] = i;
+      if (i === q.answer) { p.quiz.reviewed[q.id] = true; p.quiz.answers[q.id] = i; }
+      save(e.t.id, e.s.id); rerender();
+    };
+    return h("div", { class: "card" },
+      h("div", { class: "bar" }, openInLearn(e, e.q.sec ? "learn" : "final"), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
+      h("div", { class: "secs" }, secTags(e.s, q)),
+      h("p", { style: "font-weight:500" }, rich(q.q)),
+      codeBlock(q.code),
+      answered && mine !== undefined && q.options[mine] ? h("p", { class: "small muted" }, "처음 고른 답: " + q.options[mine]) : null,
+      h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
+        class: "opt" + (answered && i === q.answer ? " right" : "") + (chosen === i && i !== q.answer ? " wrong" : ""),
+        disabled: !!answered, onclick: () => pick(i)
+      }, o))),
+      chosen !== undefined ? h("div", { class: "verdict " + (chosen === q.answer ? "good" : "bad") }, chosen === q.answer ? "맞았어요. 복습 완료로 옮겼어요." : "아직 틀렸어요. 해설을 읽고 다시 풀어 보세요.") : null,
+      answered ? h("p", { class: "explain" }, rich(q.why)) : null,
+      h("div", { class: "tools" },
+        !answered ? h("button", { class: "tool", onclick: () => { S.peek[e.key] = true; rerender(); } }, "해설 바로 보기") : null,
+        answered && !e.reviewed ? h("button", { class: "tool", onclick: () => { delete S.review[e.key]; delete S.peek[e.key]; rerender(); } }, "다시 풀기") : null,
+        peek && !e.reviewed ? h("button", { class: "tool", onclick: () => { p.quiz.reviewed[q.id] = true; save(e.t.id, e.s.id); rerender(); } }, "복습 완료로 옮기기") : null,
+        e.reviewed ? h("button", { class: "tool", onclick: () => { delete p.quiz.reviewed[q.id]; delete S.review[e.key]; delete S.peek[e.key]; save(e.t.id, e.s.id); rerender(); } }, "복습할 문제로 되돌리기") : null));
+  }
+  function wrongPracticeCard(e) {
+    const { item, p } = e;
+    const peek = S.peek[e.key];
+    return h("div", { class: "card" },
+      h("div", { class: "bar" }, openInLearn(e, "final"), h("span", { class: "lv l1" }, "실습")),
+      h("p", { style: "font-weight:500" }, rich(item.prompt)),
+      codeBlock(item.code),
+      peek ? answerKey(item) : null,
+      peek && item.solution ? h("div", { class: "solution" }, rich(item.solution)) : null,
+      h("div", { class: "tools" },
+        h("button", { class: "tool", onclick: () => { S.peek[e.key] = !peek; rerender(); } }, peek ? "모범답안 접기" : "모범답안 보기"),
+        !e.reviewed ? h("button", { class: "tool", onclick: () => { p.practice.reviewed[item.id] = true; save(e.t.id, e.s.id); rerender(); } }, "복습 완료로 옮기기")
+          : h("button", { class: "tool", onclick: () => { delete p.practice.reviewed[item.id]; save(e.t.id, e.s.id); rerender(); } }, "복습할 문제로 되돌리기")));
+  }
+
+  /* ---------- 노트 ---------- */
+  function noteCards() {
+    const query = S.noteQuery.trim().toLowerCase();
+    const list = S.notes.filter(n => !query || `${n.text} ${n.source?.label || ""}`.toLowerCase().includes(query));
+    if (!S.notes.length) return h("div", { class: "card" }, h("p", { class: "muted" }, "아직 노트가 없습니다. 위에 직접 적거나, 공부하다가 글을 드래그해서 넣어 보세요."));
+    if (!list.length) return h("p", { class: "muted" }, "검색 결과가 없습니다.");
+    return h("div", { class: "stack" }, list.map(noteCard));
+  }
+  function noteCard(n) {
+    const date = (n.createdAt || "").slice(0, 10);
+    const from = n.source?.label
+      ? (n.source.sid
+        ? h("button", { class: "source", onclick: () => go({ name: "learn", tid: n.source.tid, sid: n.source.sid }) }, n.source.label)
+        : h("span", { class: "tag" }, n.source.label))
+      : h("span", { class: "tag" }, "직접 쓴 노트");
+    if (S.editNote === n.id) {
+      return h("div", { class: "card" },
+        from,
+        h("textarea", { id: "edit-" + n.id, "aria-label": "노트 고치기", value: S.editDraft, oninput: e => { S.editDraft = e.target.value; } }),
+        h("div", { class: "tools" },
+          h("button", { class: "btn", onclick: () => {
+            const text = S.editDraft.trim();
+            if (text) { n.text = text; saveNotes(); }
+            S.editNote = null; rerender();
+          } }, "저장"),
+          h("button", { class: "btn ghost", onclick: () => { S.editNote = null; rerender(); } }, "취소")));
+    }
+    return h("div", { class: "card" },
+      h("div", { class: "bar" }, from, h("span", { class: "meter" }, date)),
+      h("p", { class: "note-text" }, rich(n.text)),
+      h("div", { class: "tools" },
+        h("button", { class: "tool", onclick: () => { S.editNote = n.id; S.editDraft = n.text; S.confirmDelete = null; rerender(); } }, "고치기"),
+        S.confirmDelete === n.id
+          ? h("button", { class: "tool", onclick: () => { S.notes = S.notes.filter(x => x.id !== n.id); S.confirmDelete = null; saveNotes(); rerender(); } }, "정말 지우기")
+          : h("button", { class: "tool", onclick: () => { S.confirmDelete = n.id; rerender(); } }, "지우기")));
+  }
+  function exportBackup() {
+    const data = { app: "nekan", version: 1, exportedAt: new Date().toISOString(), progress: S.progress, notes: S.notes };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const a = h("a", { href: url, download: `네칸공부-백업-${data.exportedAt.slice(0, 10)}.json` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    S.backupMsg = "백업 파일을 저장했습니다. 다른 기기에서는 이 파일을 불러오면 됩니다.";
+    rerender();
+  }
+  async function importBackup(file) {
+    try {
+      const data = JSON.parse(await file.text());
+      if (data?.app !== "nekan" || !Array.isArray(data.notes) || typeof data.progress !== "object") throw new Error("format");
+      const known = new Set(S.notes.map(n => n.id));
+      const incoming = data.notes.filter(n => n && n.id && typeof n.text === "string" && !known.has(n.id));
+      S.notes = [...S.notes, ...incoming].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      let merged = 0;
+      for (const [k, p] of Object.entries(data.progress || {})) {
+        if (!S.progress[k] || String(p?.updatedAt || "") > String(S.progress[k].updatedAt || "")) { S.progress[k] = p; merged++; }
+      }
+      const ok = ls.set(STORE_KEY, JSON.stringify(S.progress)) && saveNotes();
+      S.backupMsg = ok ? `불러왔습니다. 새 노트 ${incoming.length}개, 진행 기록 ${merged}개를 합쳤습니다.` : "불러왔지만 이 브라우저에 저장하지 못했습니다.";
+    } catch {
+      S.backupMsg = "이 파일은 불러올 수 없습니다. 네칸 공부에서 저장한 백업 파일인지 확인해 주세요.";
+    }
+    rerender();
+  }
+  function viewNotes() {
+    return h("div", { class: "stack-l" },
+      h("div", { class: "stack" },
+        h("button", { class: "back", onclick: leaveTools }, "← 돌아가기"),
+        h("h1", null, "노트"),
+        h("p", { class: "muted small" }, "공부하다가 글을 드래그하면 나타나는 버튼으로도 넣을 수 있습니다.")),
+      h("form", { class: "stack", style: "gap:8px", onsubmit: e => {
+        e.preventDefault();
+        const text = S.noteDraft.trim();
+        if (!text) return;
+        addNote(text, null);
+        S.noteDraft = ""; rerender();
+      } },
+        h("textarea", { id: "note-new", "aria-label": "새 노트", placeholder: "나중에 다시 볼 내용을 적어 보세요", value: S.noteDraft, oninput: e => { S.noteDraft = e.target.value; } }),
+        h("button", { class: "btn", type: "submit" }, "노트 저장")),
+      h("div", { class: "stack" },
+        S.notes.length ? h("input", { id: "note-search", class: "search", type: "text", "aria-label": "노트 검색", placeholder: "노트 검색", value: S.noteQuery, oninput: e => {
+          S.noteQuery = e.target.value;
+          document.getElementById("note-list").replaceChildren(noteCards());
+        } }) : null,
+        h("div", { id: "note-list" }, noteCards())),
+      h("section", { class: "stack", style: "gap:8px" },
+        h("h3", null, "백업"),
+        h("p", { class: "muted small" }, "노트와 진행 기록은 이 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 사라지니 가끔 파일로 저장해 두세요. 다른 기기로 옮길 때도 이 파일을 씁니다."),
+        h("div", { class: "row" },
+          h("button", { class: "btn ghost", onclick: exportBackup }, "백업 파일 저장"),
+          h("label", { class: "btn ghost", for: "backup-file", style: "display:inline-flex;align-items:center;cursor:pointer" }, "백업 불러오기"),
+          h("input", { id: "backup-file", type: "file", accept: "application/json,.json", hidden: true, onchange: e => { if (e.target.files[0]) importBackup(e.target.files[0]); } })),
+        S.backupMsg ? h("p", { class: "small", role: "status" }, S.backupMsg) : null));
+  }
+
+  /* ---------- 홈 ---------- */
+  function topicCells(t) {
+    let on = 0, all = 0;
+    for (const s of t.scenarios || []) { all += 4; on += cellsOf(S.progress[keyOf(t.id, s.id)]).filter(Boolean).length; }
+    return [on, all];
+  }
+  function cellsEl(flags, big) {
+    return h("div", { class: "cells" + (big ? " big" : ""), "aria-hidden": "true" }, flags.map(f => h("i", { class: f ? "on" : "" })));
+  }
+  function viewHome() {
+    const platform = h("a", { class: "back", href: "../../" }, "← 공부방");
+    const head = h("header", { class: "brand" }, cellsEl([true, true, true, false], true), h("div", null,
+      h("h1", null, "네칸 공부"),
+      h("p", { class: "muted small" }, "짧은 이론을 읽고 바로 문제로 익힌 뒤, 종합문제·실습·응용으로 네 칸을 채웁니다.")));
+    const body = [];
+    if (S.loadState === "loading") body.push(h("p", { class: "muted" }, "토픽을 불러오는 중입니다."));
+    if (S.loadState === "error") body.push(h("div", { class: "note", role: "alert" }, "토픽 목록을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로 고침해 주세요."));
+    if (S.loadState === "ready" && !S.topics.length) {
+      body.push(h("div", { class: "card" }, h("h3", null, "아직 토픽이 없어요"), h("p", { class: "muted" }, "토픽이 추가되면 여기에 나타납니다.")));
+    }
+    if (S.loadState === "ready") body.push(toolLinks());
+    if (S.failedTopics) body.push(h("div", { class: "note", role: "alert" }, `토픽 ${S.failedTopics}개를 불러오지 못했습니다. 새로 고침해 주세요.`));
+    const resume = latestOpen();
+    if (resume) {
+      body.push(h("section", { class: "stack" }, h("h2", null, "이어서 하기"),
+        h("button", { class: "entry continue", onclick: () => go({ name: "learn", tid: resume.t.id, sid: resume.s.id }) },
+          cellsEl(cellsOf(resume.p)),
+          h("div", null, h("div", { class: "tag" }, resume.t.title), h("h3", null, resume.s.title)))));
+    }
+    if (S.topics.length) {
+      body.push(h("section", { class: "stack" }, h("h2", null, "토픽"), S.topics.map(t => {
+        const [on, all] = topicCells(t);
+        return h("button", { class: "entry", onclick: () => go({ name: "topic", tid: t.id }) },
+          cellsEl([0, 1, 2, 3].map(i => all > 0 && on / all > i / 4)),
+          h("div", null, h("h3", null, t.title),
+            t.subtitle ? h("p", { class: "muted small" }, t.subtitle) : null,
+            h("div", { class: "meter" }, `시나리오 ${(t.scenarios || []).length}개 · ${on}/${all}칸`)));
+      })));
+      body.push(h("p", { class: "muted small" }, "진행 기록은 지금 쓰는 기기의 브라우저에만 저장됩니다."));
+    }
+    return h("div", { class: "stack-l" }, platform, head, body);
+  }
+  function latestOpen() {
+    let best = null;
+    for (const p of Object.values(S.progress)) {
+      if (!p.updatedAt || cellsOf(p).every(Boolean)) continue;
+      const t = findTopic(p.topicId), s = findScenario(t, p.scenarioId);
+      if (s && (!best || p.updatedAt > best.p.updatedAt)) best = { t, s, p };
+    }
+    return best;
+  }
+
+  /* ---------- 토픽 ---------- */
+  function viewTopic(t) {
+    return h("div", { class: "stack-l" },
+      h("div", { class: "stack" },
+        h("div", { class: "bar" }, h("button", { class: "back", onclick: () => go({ name: "home" }) }, "← 전체 토픽"), toolLinks()),
+        h("h1", null, t.title),
+        t.subtitle ? h("p", { class: "muted" }, t.subtitle) : null),
+      h("div", { class: "stack" }, (t.scenarios || []).map(s =>
+        h("button", { class: "entry", onclick: () => go({ name: "learn", tid: t.id, sid: s.id }) },
+          cellsEl(cellsOf(S.progress[keyOf(t.id, s.id)])),
+          h("div", null, h("h3", null, s.title), h("p", { class: "muted small" }, s.situation))))));
+  }
+
+  /* ---------- 학습 화면 ---------- */
+  /* 이론의 소제목(h)마다 한 묶음이다. 문제의 sec가 묶음 번호(1부터)와 같으면 그 묶음 바로 뒤에 나오고, sec가 없으면 종합문제로 간다. */
+  const sectionCount = s => (s.theory || []).filter(b => b.t === "h").length;
+  const inlineOf = s => (s.quiz || []).filter(q => q.sec >= 1 && q.sec <= sectionCount(s));
+  const finalOf = s => { const inl = new Set(inlineOf(s)); return (s.quiz || []).filter(q => !inl.has(q)); };
+  const headings = s => (s.theory || []).filter(b => b.t === "h").map(b => b.text);
+  /* 문제가 어느 이론 묶음에서 나왔는지. 바로 풀기는 sec, 종합문제는 ref(관련 묶음 번호 배열)를 쓴다. */
+  function secTags(s, q) {
+    const hs = headings(s);
+    const nums = (q.sec ? [q.sec] : Array.isArray(q.ref) ? q.ref : []).filter(n => hs[n - 1]);
+    return nums.length ? nums.map(n => h("span", { class: "sec" }, `${n}. ${hs[n - 1]}`)) : [h("span", { class: "sec" }, "여러 묶음 종합")];
+  }
+  function viewLearn(t, s) {
+    const p = prog(t.id, s.id);
+    const stage = S.stage === "final" ? stageFinal(t, s, p) : stageLearn(t, s, p);
+    const tabDone = { learn: p.theory.done, final: p.quiz.done && p.practice.done && p.apply.done };
+    const rail = h("nav", { class: "rail", "aria-label": "학습 단계" }, h("div", null, TABS.map(([k, label]) =>
+      h("button", { class: tabDone[k] ? "done" : "", "aria-current": S.stage === k ? "step" : null, onclick: () => setStage(k) },
+        label, h("small", null, tabDone[k] ? "완료" : "")))));
+    return h("div", { class: "stack-l" },
+      h("div", { class: "stack" },
+        h("div", { class: "bar" }, h("button", { class: "back", onclick: () => go({ name: "topic", tid: t.id }) }, "← " + t.title), toolLinks()),
+        h("h1", null, s.title)),
+      stage, rail);
+  }
+
+  function recordAnswer(t, s, p, q, i) {
+    p.quiz.answers[q.id] = i;
+    if (i !== q.answer) {
+      if (!p.quiz.wrongEver.includes(q.id)) p.quiz.wrongEver.push(q.id);
+      p.quiz.wrongChoice[q.id] = i;
+      delete p.quiz.reviewed[q.id];
+    }
+    if (finalOf(s).every(x => p.quiz.answers[x.id] !== undefined)) p.quiz.done = true;
+    save(t.id, s.id);
+  }
+  function stageLearn(t, s, p) {
+    const groups = [[]];
+    for (const b of s.theory || []) { if (b.t === "h") groups.push([]); groups[groups.length - 1].push(b); }
+    const inline = inlineOf(s);
+    const answered = inline.filter(q => p.quiz.answers[q.id] !== undefined).length;
+    return h("div", { class: "stack" },
+      h("div", { class: "situation" }, h("div", { class: "tag" }, "오늘의 상황"), h("p", null, rich(s.situation))),
+      groups.map((blocks, n) => [blocks.map(block), inline.filter(q => q.sec === n).map(q => quizCard(t, s, p, q, "바로 풀기"))]),
+      inline.length ? h("div", { class: "meter" }, `바로 풀기 ${answered} / ${inline.length}`) : null,
+      h("button", { class: "btn wide", onclick: () => { p.theory.done = true; save(t.id, s.id); setStage("final"); } },
+        inline.length && answered < inline.length ? "종합으로 넘어가기 (남은 문제는 그대로 둡니다)" : "종합문제 풀기"));
+  }
+  function quizCard(t, s, p, q, label) {
+    const chosen = p.quiz.answers[q.id], answered = chosen !== undefined;
+    return h("div", { class: "card check" },
+      h("div", { class: "row" }, h("span", { class: "tag" }, label), h("span", { class: `lv l${levelOf(q)}` }, LEVELS[levelOf(q)])),
+      h("div", { class: "secs" }, secTags(s, q)),
+      h("p", { style: "font-weight:500" }, rich(q.q)),
+      codeBlock(q.code),
+      h("div", { class: "stack", style: "gap:8px" }, q.options.map((o, i) => h("button", {
+        class: "opt" + (answered && i === q.answer ? " right" : "") + (answered && i === chosen && i !== q.answer ? " wrong" : ""),
+        disabled: answered, onclick: () => { recordAnswer(t, s, p, q, i); rerender(); }
+      }, o))),
+      answered ? h("div", { class: "verdict " + (chosen === q.answer ? "good" : "bad") }, chosen === q.answer ? "맞았어요" : "틀렸어요. 오답노트에 담았어요.") : null,
+      answered ? h("p", { class: "explain" }, rich(q.why)) : null,
+      answered && chosen !== q.answer ? h("button", { class: "tool", onclick: () => { delete p.quiz.answers[q.id]; save(t.id, s.id); rerender(); } }, "다시 풀기") : null);
+  }
+
+  /* 종합: 종합문제, 실습, 응용을 한 화면에 차례로 둔다 */
+  function stageFinal(t, s, p) {
+    const qs = finalOf(s);
+    return h("div", { class: "stack-l" },
+      qs.length ? h("section", { class: "stack" }, h("h2", null, "종합문제"),
+        h("p", { class: "muted small" }, "여러 묶음을 엮는 문제입니다. 고르면 바로 해설이 나옵니다."),
+        qs.map((q, n) => quizCard(t, s, p, q, `종합 ${n + 1}`)),
+        h("div", { class: "meter" }, `종합문제 ${qs.filter(q => p.quiz.answers[q.id] !== undefined).length} / ${qs.length}`),
+        moreCard(t, s, p, "quiz")) : null,
+      (s.practice || []).length ? h("section", { class: "stack part" }, h("h2", null, "실습"), stagePractice(t, s, p)) : null,
+      s.apply ? h("section", { class: "stack part" }, h("h2", null, "응용"), stageApply(t, s, p)) : null);
+  }
+  /* 문제에 딸린 코드. 들여쓰기를 살려 고정폭 글꼴로 보여 준다. */
+  const codeBlock = code => code ? h("div", { class: "formula", tabindex: "0" }, code) : null;
+  function block(b) {
+    if (b.t === "h") return h("h2", null, b.text);
+    if (b.t === "formula") return h("div", { class: "formula", tabindex: "0" }, b.text);
+    if (b.t === "callout") return h("div", { class: "callout" }, rich(b.text));
+    if (b.t === "list") return h("ul", { class: "clean" }, (b.items || []).map(i => h("li", null, rich(i))));
+    if (b.t === "table") return h("div", { class: "tablewrap", tabindex: "0" }, h("table", null,
+      h("thead", null, h("tr", null, (b.head || []).map(c => h("th", null, c)))),
+      h("tbody", null, (b.rows || []).map(r => h("tr", null, r.map(c => h("td", null, String(c))))))));
+    return h("p", null, rich(b.text));
+  }
+
+  /* 문제 더 만들기: 사이트에는 AI가 없으므로 Claude Code에 보낼 요청문을 만들어 준다 */
+  function moreRequest(t, s, p, kind) {
+    const wrong = p.quiz.wrongEver.filter(id => (s.quiz || []).some(q => q.id === id));
+    const level = S.moreLevel[keyOf(t.id, s.id)] || 3;
+    const what = kind === "quiz" ? `${LEVELS[level]}(level ${level}) 객관식 문제 10개` : "실습 5개";
+    const focus = wrong.length ? ` 내가 처음에 틀린 문제는 ${wrong.join(", ")}이니 이 개념을 중심으로 만들어 줘.` : "";
+    return `nekan-study 저장소의 CLAUDE.md를 따라 apps/nekan/topics/${t.id}.json의 시나리오 ${s.id}에 ${what}를 더 추가해 줘.${focus} 검사를 통과시키고 main에 반영해 줘.`;
+  }
+  function moreCard(t, s, p, kind) {
+    const key = keyOf(t.id, s.id) + "/" + kind;
+    const label = kind === "quiz" ? "문제 더 만들기" : "실습 더 만들기";
+    if (!S.moreOpen[key]) {
+      return h("button", { class: "btn ghost wide", onclick: () => { S.moreOpen[key] = true; rerender(); } }, label);
+    }
+    const text = moreRequest(t, s, p, kind);
+    const boxId = "more-" + s.id + "-" + kind;
+    const copy = async () => {
+      try { await navigator.clipboard.writeText(text); S.copied = key; rerender(); }
+      catch { const box = document.getElementById(boxId); box.focus(); box.select(); }
+    };
+    return h("div", { class: "card" },
+      h("h3", null, label),
+      h("p", { class: "small" }, "새 문제는 Claude Code가 만들어 사이트에 올립니다. 아래 요청문을 복사해 Claude Code에 붙여 넣으세요. 사이트에 반영되면 지금 칸에 이어서 나옵니다."),
+      kind === "quiz" ? h("div", { class: "tools" }, [1, 2, 3].map(l => h("button", {
+        class: "tool", "aria-pressed": String((S.moreLevel[keyOf(t.id, s.id)] || 3) === l),
+        onclick: () => { S.moreLevel[keyOf(t.id, s.id)] = l; S.copied = ""; rerender(); }
+      }, LEVELS[l]))) : null,
+      h("textarea", { id: boxId, class: "prompt-box", readonly: true, value: text, "aria-label": "Claude Code 요청문" }),
+      h("div", { class: "row" },
+        h("button", { class: "btn", onclick: copy }, S.copied === key ? "복사했어요" : "요청문 복사"),
+        h("a", { class: "btn ghost", href: "https://claude.ai/code", target: "_blank", rel: "noopener" }, "Claude Code 열기")));
+  }
+
+  /* 실습 */
+  function normalize(v) { return String(v).toLowerCase().replace(/[\s,·.\-_()]/g, ""); }
+  function isCorrect(item, value) {
+    if (item.type === "number") {
+      const n = parseFloat(String(value).replace(/[,\s]/g, ""));
+      return Number.isFinite(n) && Math.abs(n - item.answer) <= (item.tolerance ?? 0);
+    }
+    if (item.type === "text") return (item.accept || []).some(a => normalize(a) === normalize(value));
+    if (item.type === "order") return Array.isArray(value) && value.length === item.items.length && value.every((v, i) => v === i);
+    return false;
+  }
+  function shuffled(item) {
+    let seed = [...item.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const arr = item.items.map((_, i) => i);
+    for (let i = arr.length - 1; i > 0; i--) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const j = seed % (i + 1); [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    if (arr.every((v, i) => v === i)) arr.reverse();
+    return arr;
+  }
+  function stagePractice(t, s, p) {
+    const items = s.practice || [];
+    const resolved = i => { const r = p.practice.items[i.id]; return r && (r.ok || r.revealed); };
+    const count = items.filter(resolved).length;
+    return h("div", { class: "stack" },
+      h("div", { class: "meter" }, `${count} / ${items.length} 해결`),
+      items.map((item, n) => practiceCard(t, s, p, item, n, items, resolved)),
+      moreCard(t, s, p, "practice"));
+  }
+  function answerKey(item) {
+    if (item.type === "order") {
+      return h("div", { class: "answer-key" }, "모범답안", h("ol", null, item.items.map(x => h("li", null, x))));
+    }
+    const value = item.type === "number" ? `${item.answer}${item.unit ? " " + item.unit : ""}` : (item.accept || [])[0];
+    return h("div", { class: "answer-key" }, "모범답안: " + value);
+  }
+  function markMissed(p, item) {
+    if (!p.practice.missed.includes(item.id)) p.practice.missed.push(item.id);
+    delete p.practice.reviewed[item.id];
+  }
+  function practiceCard(t, s, p, item, n, items, resolved) {
+    const rec = p.practice.items[item.id] || { tries: 0 };
+    const done = rec.ok || rec.revealed;
+    const draftKey = keyOf(t.id, s.id) + "/" + item.id;
+    const commit = value => {
+      const ok = isCorrect(item, value);
+      p.practice.items[item.id] = { ...rec, tries: (rec.tries || 0) + 1, value, ok };
+      if (!ok) markMissed(p, item);
+      if (items.every(resolved)) p.practice.done = true;
+      save(t.id, s.id); rerender();
+    };
+    const reveal = () => {
+      p.practice.items[item.id] = { ...rec, revealed: true };
+      markMissed(p, item);
+      if (items.every(resolved)) p.practice.done = true;
+      save(t.id, s.id); rerender();
+    };
+    const retry = () => {
+      delete p.practice.items[item.id];
+      delete S.drafts[draftKey];
+      delete S.orderDraft[draftKey];
+      save(t.id, s.id); rerender();
+    };
+    let control;
+    if (item.type === "order") {
+      const placed = S.orderDraft[draftKey] || (Array.isArray(rec.value) ? rec.value : []);
+      const rest = shuffled(item).filter(i => !placed.includes(i));
+      const set = v => { S.orderDraft[draftKey] = v; rerender(); };
+      control = h("div", { class: "stack", style: "gap:10px" },
+        placed.length ? h("div", { class: "chips" }, placed.map((i, pos) => h("button", {
+          class: "chip placed", disabled: done, onclick: () => set(placed.filter(x => x !== i))
+        }, h("span", { class: "n" }, pos + 1), item.items[i]))) : done ? null : h("p", { class: "muted small" }, "아래 항목을 순서대로 눌러 쌓으세요. 쌓은 항목을 누르면 빠집니다."),
+        rest.length && !done ? h("div", { class: "chips" }, rest.map(i => h("button", { class: "chip", onclick: () => set([...placed, i]) }, item.items[i]))) : null,
+        !done ? h("button", { class: "btn", disabled: rest.length > 0, onclick: () => commit(placed) }, "확인") : null);
+    } else {
+      const onsubmit = e => {
+        e.preventDefault();
+        const v = S.drafts[draftKey] ?? rec.value ?? "";
+        if (String(v).trim()) commit(String(v).trim());
+      };
+      control = h("form", { class: "field", onsubmit },
+        h("input", {
+          id: "in-" + s.id + "-" + item.id, type: "text", "aria-label": "답 입력", autocomplete: "off",
+          inputmode: item.type === "number" && !item.signed ? "decimal" : "text",
+          value: S.drafts[draftKey] ?? (rec.value ?? ""), disabled: done,
+          oninput: e => { S.drafts[draftKey] = e.target.value; }
+        }),
+        item.unit ? h("span", { class: "muted" }, item.unit) : null,
+        !done ? h("button", { class: "btn", type: "submit" }, "확인") : null,
+        !done && item.type === "number" ? h("button", { class: "tool", type: "button", onclick: () => openCalc({ key: draftKey, id: "in-" + s.id + "-" + item.id }) }, "계산기") : null);
+    }
+    const wrongNow = !done && rec.tries > 0;
+    return h("div", { class: "card" + (done ? " ok" : "") },
+      h("div", { class: "meter" }, `실습 ${n + 1}`),
+      h("p", { style: "font-weight:500" }, rich(item.prompt)),
+      codeBlock(item.code),
+      control,
+      rec.ok ? h("div", { class: "verdict good" }, "정답입니다") : null,
+      rec.revealed && !rec.ok ? h("div", { class: "tag" }, "모범답안을 확인했어요. 이해한 뒤 다시 풀어 보세요.") : null,
+      wrongNow ? h("div", { class: "verdict bad" }, "아직 아니에요. 다시 해 보세요.") : null,
+      wrongNow && item.hint ? h("p", { class: "small muted" }, "힌트: ", rich(item.hint)) : null,
+      !done ? h("button", { class: "btn ghost", onclick: reveal }, "모범답안 보기") : null,
+      done ? answerKey(item) : null,
+      done && item.solution ? h("div", { class: "solution" }, rich(item.solution)) : null,
+      done ? h("button", { class: "btn ghost", onclick: retry }, "다시 풀어 보기") : null);
+  }
+
+  /* 응용: 모범 답안과 점검 기준으로 스스로 채점 */
+  function stageApply(t, s, p) {
+    const a = s.apply || {};
+    const k = keyOf(t.id, s.id);
+    const draftKey = "draft/" + k;
+    if (S.drafts[draftKey] === undefined) S.drafts[draftKey] = p.apply.answer || ls.get(draftKey);
+    const answer = () => (S.drafts[draftKey] || "").trim();
+    const keepAnswer = () => { if (answer()) p.apply.answer = answer(); };
+    const list = t.scenarios || [];
+    const next = list[list.findIndex(x => x.id === s.id) + 1];
+
+    return h("div", { class: "stack" },
+      h("div", { class: "situation" }, h("div", { class: "tag" }, "응용 과제"), h("p", null, rich(a.prompt))),
+      h("label", { for: "apply-" + s.id, class: "small muted" }, "내 답안 (근거와 계산을 함께 적어 보세요)"),
+      h("textarea", {
+        id: "apply-" + s.id, value: S.drafts[draftKey],
+        oninput: e => { S.drafts[draftKey] = e.target.value; ls.set(draftKey, e.target.value); }
+      }),
+      !p.apply.revealed ? h("button", { class: "btn", onclick: () => {
+        p.apply.revealed = true; keepAnswer(); save(t.id, s.id); rerender();
+      } }, "모범 답안과 비교하기") : h("div", { class: "card" },
+        h("h3", null, "모범 답안"),
+        h("div", { class: "solution" }, rich(a.model)),
+        (a.rubric || []).length ? h("div", null, h("div", { class: "tag" }, "내 답안 점검 기준"),
+          h("ul", { class: "clean" }, a.rubric.map(r => h("li", null, rich(r))))) : null),
+      p.apply.revealed && !p.apply.done ? h("button", { class: "btn wide", onclick: () => {
+        p.apply.done = true; keepAnswer(); save(t.id, s.id); rerender();
+      } }, "이 칸 완료하기") : null,
+      p.apply.done ? (next
+        ? h("button", { class: "btn wide", onclick: () => go({ name: "learn", tid: t.id, sid: next.id }) }, "다음 시나리오: " + next.title)
+        : h("button", { class: "btn wide", onclick: () => go({ name: "topic", tid: t.id }) }, "토픽으로 돌아가기")) : null);
+  }
+
+  /* ---------- 토픽 불러오기: topics/index.json에 적힌 파일을 읽는다 ---------- */
+  async function fetchJson(path) {
+    const res = await fetch(path, { cache: "no-cache" });
+    if (!res.ok) throw new Error(path + " " + res.status);
+    return res.json();
+  }
+  async function loadTopics() {
+    try {
+      const ids = await fetchJson("topics/index.json");
+      const results = await Promise.allSettled(ids.map(id => fetchJson(`topics/${id}.json`).then(t => ({ ...t, id }))));
+      S.topics = results.filter(r => r.status === "fulfilled").map(r => r.value)
+        .sort((a, b) => String(b.addedAt || "").localeCompare(String(a.addedAt || "")));
+      for (const t of S.topics) for (const s of t.scenarios || []) (s.quiz || []).sort((a, b) => levelOf(a) - levelOf(b));
+      S.failedTopics = results.length - S.topics.length;
+      S.loadState = "ready";
+    } catch { S.loadState = "error"; }
+    enter(parseHash());
+  }
+
+  /* ---------- 계산기 ----------
+     eval을 쓰지 않고 직접 계산한다. 지원: + − × ÷ ^ 괄호, 소수점, 뒤에 붙는 %(100으로 나눔), 앞에 붙는 −.
+     실습 숫자 칸에서 열면 결과를 그 칸에 넣을 수 있다. */
+  const CALC = { expr: "", out: "", err: false, hist: [], target: null, open: false, fresh: false };
+  function calcEval(src) {
+    const t = String(src).replace(/,/g, "").replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
+    let i = 0;
+    const peek = () => { while (t[i] === " ") i++; return t[i]; };
+    const fail = m => { throw new Error(m); };
+    function num() {
+      const m = /^\d*\.?\d+(e[+-]?\d+)?|^\d+\./i.exec(t.slice(i));
+      if (!m) fail("식이 완성되지 않았어요");
+      i += m[0].length; return parseFloat(m[0]);
+    }
+    function atom() {
+      const c = peek();
+      if (c === "-") { i++; return -power(); }
+      if (c === "+") { i++; return power(); }
+      let v;
+      if (c === "(") { i++; v = expr(); if (peek() !== ")") fail("괄호가 닫히지 않았어요"); i++; }
+      else v = num();
+      while (peek() === "%") { i++; v /= 100; }
+      return v;
+    }
+    function power() { const b = atom(); if (peek() === "^") { i++; return Math.pow(b, power()); } return b; }
+    function term() {
+      let v = power();
+      for (let c = peek(); c === "*" || c === "/" || c === "(" ; c = peek()) {
+        if (c === "(") { v *= power(); continue; }
+        i++; const r = power();
+        if (c === "/" && r === 0) fail("0으로 나눌 수 없어요");
+        v = c === "*" ? v * r : v / r;
+      }
+      return v;
+    }
+    function expr() { let v = term(); for (let c = peek(); c === "+" || c === "-"; c = peek()) { i++; v = c === "+" ? v + term() : v - term(); } return v; }
+    if (!t.trim()) return null;
+    const v = expr();
+    if (peek() !== undefined) fail("읽을 수 없는 글자가 있어요");
+    if (!Number.isFinite(v)) fail("값이 너무 커요");
+    return Number(v.toPrecision(12));
+  }
+  const calcFmt = v => v === null ? "" : (Math.abs(v) >= 1e15 || (v !== 0 && Math.abs(v) < 1e-6)) ? String(v) : v.toLocaleString("ko-KR", { maximumFractionDigits: 10 });
+  function calcPreview() {
+    try { const v = calcEval(CALC.expr); CALC.out = v === null ? "" : "= " + calcFmt(v); CALC.err = false; }
+    catch { CALC.out = ""; CALC.err = false; }
+  }
+  function calcPress(k) {
+    if (k === "C") { CALC.expr = ""; CALC.out = ""; CALC.err = false; }
+    else if (k === "⌫") { CALC.expr = CALC.expr.slice(0, -1); calcPreview(); }
+    else if (k === "=") {
+      try {
+        const v = calcEval(CALC.expr);
+        if (v === null) return;
+        CALC.hist = [{ e: CALC.expr, v }, ...CALC.hist.filter(x => x.e !== CALC.expr)].slice(0, 6);
+        CALC.expr = String(v); CALC.out = "= " + calcFmt(v); CALC.err = false;
+      } catch (e) { CALC.out = e.message; CALC.err = true; }
+    } else {
+      // 결과가 나온 뒤 숫자를 누르면 새 계산을 시작하고, 연산자를 누르면 결과에 이어서 계산한다.
+      if (CALC.fresh && /^[0-9.(]/.test(k)) CALC.expr = "";
+      CALC.expr += k; calcPreview();
+    }
+    CALC.fresh = k === "=" && !CALC.err;
+    drawCalc();
+  }
+  function calcResult() { try { return calcEval(CALC.expr); } catch { return null; } }
+  function openCalc(target) { CALC.target = target || null; CALC.open = true; drawCalc(); }
+  function closeCalc() { CALC.open = false; drawCalc(); document.getElementById("calc-fab").focus(); }
+  function calcVisible(on) {
+    document.getElementById("calc-fab").hidden = !on || CALC.open;
+    if (!on && CALC.open) { CALC.open = false; drawCalc(); }
+  }
+  function drawCalc() {
+    const box = document.getElementById("calc"), fab = document.getElementById("calc-fab");
+    box.hidden = !CALC.open;
+    fab.hidden = CALC.open || !app.classList.contains("learning");
+    if (!CALC.open) return box.replaceChildren();
+    const keys = [["C", "(", ")", "%", "⌫"], ["7", "8", "9", "÷", "^"], ["4", "5", "6", "×", "−"], ["1", "2", "3", "+", "="], ["0", "00", ".", null, null]];
+    const v = calcResult();
+    const target = CALC.target && document.getElementById(CALC.target.id);
+    box.replaceChildren(h("div", null,
+      h("div", { class: "bar" },
+        h("strong", null, "계산기"),
+        h("button", { class: "tool", type: "button", onclick: closeCalc }, "닫기")),
+      h("div", { class: "calc-screen", "aria-live": "polite" },
+        h("div", { class: "calc-expr" }, CALC.expr || " "),
+        h("div", { class: "calc-out" + (CALC.err ? " err" : "") }, CALC.out || " ")),
+      CALC.hist.length ? h("div", { class: "calc-hist", "aria-label": "최근 계산" }, CALC.hist.map(x =>
+        h("button", { type: "button", onclick: () => { CALC.expr += String(x.v); calcPreview(); drawCalc(); } }, `${x.e} = ${calcFmt(x.v)}`))) : null,
+      h("div", { class: "calc-keys" }, keys.flat().map(k => k === null ? h("span") : h("button", {
+        type: "button", class: k === "=" ? "eq" : /[÷×−+^%()]/.test(k) ? "op" : "",
+        "aria-label": { "⌫": "지우기", "C": "모두 지우기", "÷": "나누기", "×": "곱하기", "−": "빼기", "^": "거듭제곱" }[k],
+        onclick: () => calcPress(k)
+      }, k))),
+      target ? h("button", { class: "btn wide", type: "button", disabled: v === null, onclick: () => {
+        const val = String(v);
+        S.drafts[CALC.target.key] = val; target.value = val;
+        CALC.open = false; drawCalc(); target.focus();
+        toast("답 칸에 " + calcFmt(v) + "을(를) 넣었어요. 확인을 눌러 채점하세요.");
+      } }, v === null ? "계산한 뒤 답 칸에 넣을 수 있어요" : `답 칸에 넣기: ${calcFmt(v)}`) : null,
+      h("p", { class: "muted small", style: "margin:0" }, "^는 거듭제곱(1.05^3), %는 100으로 나눕니다(15% = 0.15).")));
+  }
+  function initCalc() {
+    const fab = document.getElementById("calc-fab");
+    fab.addEventListener("click", () => openCalc(null));
+    document.addEventListener("keydown", e => {
+      if (!CALC.open) return;
+      if (e.key === "Escape") return closeCalc();
+      if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "")) return;
+      const map = { "*": "×", "/": "÷", "-": "−", "Enter": "=", "Backspace": "⌫", "Delete": "C" };
+      const k = map[e.key] || (/^[0-9.+()^%]$/.test(e.key) ? e.key : null);
+      if (k) { e.preventDefault(); calcPress(k); }
+    });
+  }
+
+  loadProgress();
+  loadNotes();
+  initSelectionBar();
+  initCalc();
+  S.route = parseHash();
+  render();
+  loadTopics();
+})();
+</script>
+</body>
+</html>

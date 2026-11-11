@@ -1,0 +1,17 @@
+{
+  "platform": {
+    "name": "공부방",
+    "tagline": "필요할 때 꺼내 쓰는 작은 학습 앱 모음"
+  },
+  "apps": [
+    {
+      "id": "nekan",
+      "name": "네칸 공부",
+      "description": "짧은 이론과 바로 푸는 문제로 익히고, 종합문제·실습·응용으로 네 칸을 채웁니다.",
+      "path": "apps/nekan/",
+      "icon": "cells",
+      "status": "live",
+      "addedAt": "2026-11-01"
+    }
+  ]
+}

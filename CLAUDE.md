@@ -1,12 +1,24 @@
-# 네칸 공부
+# 공부방 플랫폼과 네칸 공부
 
-토픽을 시나리오별로 공부하는 모바일 웹앱. 학습 화면에서는 짧은 이론 묶음마다 관련 문제를 바로 풀고, 종합 화면에서 종합문제 → 실습 → 응용으로 마무리한다. 진행은 학습, 종합문제, 실습, 응용 네 칸으로 표시한다. GitHub Pages로 배포하는 정적 사이트다. 서버, API 키, 빌드 단계가 없다.
+이 저장소는 작은 학습 앱을 모아 두는 **공부방** 플랫폼이다. 첫 화면(`index.html`)은 `apps.json`에 등록된 앱을 카드로 보여 주고, 각 앱은 `apps/<id>/` 폴더에 따로 산다. 첫 번째 앱이 네칸 공부다. GitHub Pages로 배포하는 정적 사이트이고, 서버, API 키, 빌드 단계가 없다.
 
-- 사이트: https://kds825.github.io/nekan-study/
-- 앱 코드: `index.html`
-- 토픽 목록: `topics/index.json` (토픽 id 배열)
-- 토픽 내용: `topics/<id>.json`
-- 형식 검사: `node scripts/check-topics.mjs`
+- 플랫폼: https://kds825.github.io/nekan-study/
+- 플랫폼 첫 화면: `index.html`, 앱 목록: `apps.json`, 검사: `node scripts/check-apps.mjs`
+- 네칸 공부: https://kds825.github.io/nekan-study/apps/nekan/
+  - 앱 코드: `apps/nekan/index.html`
+  - 토픽 목록: `apps/nekan/topics/index.json` (토픽 id 배열)
+  - 토픽 내용: `apps/nekan/topics/<id>.json`
+  - 형식 검사: `node scripts/check-topics.mjs`
+
+예전 주소(`/nekan-study/#learn-…` 등)로 들어오면 첫 화면이 네칸 앱으로 넘겨 준다. 모든 앱은 같은 사이트(kds825.github.io)라 localStorage를 함께 쓰므로, 새 앱은 저장 키 이름을 앱 id로 시작해 겹치지 않게 한다(네칸은 `nekan-`).
+
+## 새 앱을 추가해 달라고 하면
+
+플랫폼 첫 화면의 "새 앱 만들기"가 만든 요청문이 올 수 있다.
+
+1. `apps/<id>/index.html`에 앱을 만든다. id는 영문 소문자, 숫자, 하이픈. 네칸과 같은 색 토큰(밝은·어두운 모드)과 모바일 우선 레이아웃을 쓰고, 첫 화면 위에 `../../`로 가는 "← 공부방" 링크를 둔다.
+2. `apps.json`의 `apps` 배열에 `id`, `name`, `description`, `path`(`apps/<id>/`), `icon`, `status`(`live` 또는 `soon`), `addedAt`을 넣는다. 첫 화면에 앱별 현황을 보이려면 `index.html`의 `SUMMARY`에 그 앱의 저장 키를 읽는 함수를 더한다.
+3. `node scripts/check-apps.mjs`와 `node scripts/check-topics.mjs`를 통과시키고, 브라우저로 첫 화면과 앱을 열어 확인한 뒤 커밋하고 푸시한다.
 
 `main` 브랜치에 들어간 내용이 사이트에 배포된다. 작업 브랜치에 푸시한 것은 아직 배포된 것이 아니다. 작업 브랜치라면 `main`에 병합할 PR을 만들고, 병합해야 사이트에 반영된다고 사용자에게 알린다.
 
@@ -14,9 +26,9 @@
 
 진행 기록, 오답노트, 노트는 사용자 브라우저의 localStorage에만 있어 기기 간에 자동으로 공유되지 않고, 저장소에서 읽을 수 없다. 사용자는 노트 화면의 백업 파일로 옮길 수 있다. 저장소는 공개이므로 비밀번호, 고객 정보 같은 내용을 넣지 않는다.
 
-## 사용자가 토픽을 말하면
+## 네칸 공부: 사용자가 토픽을 말하면
 
-1. 아래 형식대로 `topics/<id>.json`을 쓰고 `topics/index.json`에 id를 추가한다. id는 영문 소문자, 숫자, 하이픈만 쓰고 `--`는 쓰지 않는다.
+1. 아래 형식대로 `apps/nekan/topics/<id>.json`을 쓰고 `apps/nekan/topics/index.json`에 id를 추가한다. id는 영문 소문자, 숫자, 하이픈만 쓰고 `--`는 쓰지 않는다.
 2. 숫자 답은 node로 검산하고 `node scripts/check-topics.mjs`를 통과시킨다.
 3. 변경을 커밋하고 푸시한다. 위 브랜치 규칙을 따른다.
 4. 사이트 주소와 반영 상태를 알려 준다.
