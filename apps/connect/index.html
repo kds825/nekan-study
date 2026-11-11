@@ -101,7 +101,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
   const KEY = "connect-data-v1";
   const app = document.getElementById("app");
   const MODE_KEY = "connect-mode-v1";
-  const S = { route: "people", pid: null, q: "", filter: "all", chat: [], ask: "", importState: null, msg: "", editing: false,
+  const S = { route: "find", pid: null, q: "", filter: "none", chat: [], ask: "", importState: null, msg: "", editing: false,
     kbTab: "public", kbQ: "", kbEdit: null, kbDraft: { title: "", text: "", tags: "" }, kbWarn: null };
   let DB = { version: 1, contacts: [], importedAt: null, sample: false, kb: { public: [], private: [] } };
   /* 시연(demo) 모드: 공개 지식만 쓰고, 사람·개인정보 화면을 숨기고, 모든 답에서 개인정보를 가린다. */
@@ -143,11 +143,11 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
   function parseHash() {
     const r = location.hash.slice(1);
     if (r.startsWith("p-")) return { route: "person", pid: r.slice(2) };
-    if (["ask", "import", "kb"].includes(r)) return { route: r };
-    return { route: "people" };
+    if (["import", "kb"].includes(r)) return { route: r };
+    return { route: "find" };   // 예전 #people, #ask 주소도 찾기 화면으로
   }
   /* 시연 모드에서는 사람·가져오기 화면으로 가지 못한다. */
-  const allowed = r => !demo() || r === "ask" || r === "kb";
+  const allowed = r => !demo() || r === "find" || r === "kb";
   function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else render(); }
   window.addEventListener("hashchange", () => { Object.assign(S, parseHash(), { editing: false }); render(); window.scrollTo(0, 0); });
 
@@ -263,98 +263,14 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
         { id: "kv2", title: "오승현 파트너 소개 경로", tags: ["바다회계법인"], text: "바다회계법인 오승현 파트너는 대학 동문 모임에서 소개받았습니다.\nIFRS 18 공동 세미나를 제안해 볼 만합니다." }
       ]
     };
-    save(); go(demo() ? "ask" : "people");
+    save(); go("find");
   }
 
   /* ---------- 묻기: 기기 안에서 규칙으로 답한다 ---------- */
-  const ROLES = {
-    "재무·회계": ["재무", "회계", "경리", "자금", "finance", "cfo", "ir", "세무", "감사"],
-    "영업": ["영업", "세일즈", "sales", "사업개발", "bd", "판매"],
-    "마케팅": ["마케팅", "marketing", "홍보", "브랜드", "pr"],
-    "인사": ["인사", "hr", "채용", "총무"],
-    "IT": ["it", "전산", "정보", "개발", "cto", "시스템", "보안", "디지털", "dx", "ax"],
-    "구매": ["구매", "조달", "purchasing", "소싱"],
-    "법무": ["법무", "legal", "컴플라이언스", "준법"],
-    "생산": ["생산", "제조", "품질", "공장"],
-    "기획": ["기획", "전략", "경영지원", "조정"],
-    "임원": ["대표", "ceo", "사장", "부사장", "전무", "상무", "이사", "임원", "본부장", "cfo", "cto", "coo", "파트너", "실장"]
-  };
-  const ROLE_TRIGGERS = { "재무·회계": ["재무", "회계", "경리", "자금", "세무"], "영업": ["영업", "세일즈"], "마케팅": ["마케팅", "홍보"], "인사": ["인사", "채용"], "IT": ["it", "전산", "개발", "보안", "디지털", "ai"], "구매": ["구매", "조달"], "법무": ["법무", "컴플라이언스"], "생산": ["생산", "제조", "품질"], "기획": ["기획", "전략"], "임원": ["임원", "대표", "경영진", "의사결정", "ceo", "사장", "c레벨"] };
-  const textOf = c => norm(`${c.title || ""} ${c.dept || ""}`);
-  /* 영문 약어(it, pr, cfo…)는 낱말 단위로만, 한글은 포함 여부로 맞춘다. 'director' 안의 'ir'을 재무로 잡지 않기 위해서다. */
-  function roleHit(c, term) {
-    if (/^[a-z]+$/.test(term)) return new RegExp(`(^|[^a-z])${term}([^a-z]|$)`, "i").test(`${c.title || ""} ${c.dept || ""}`);
-    return textOf(c).includes(norm(term));
-  }
-  function askHas(q, term) {
-    if (/^[a-z]+$/.test(term)) return new RegExp(`(^|[^a-z])${term}([^a-z]|$)`, "i").test(q);
-    return norm(q).includes(term);
-  }
-
-  function parseDays(q) {
-    const m = q.match(/(\d+)\s*(일|주|개월|달|년)/);
-    if (!m) return null;
-    const n = +m[1];
-    return { 일: n, 주: n * 7, 개월: n * 30, 달: n * 30, 년: n * 365 }[m[2]];
-  }
-  function answer(qRaw) {
-    const q = qRaw.trim(), qn = norm(q);
-    const how = [];
-    let list = DB.contacts.slice();
-    if (!list.length) return { text: "아직 명함이 없습니다. '가져오기' 탭에서 리멤버 엑셀을 올리거나 샘플로 둘러보세요.", how: [], people: [] };
-
-    // 1) 이름이 그대로 들어 있으면 그 사람 소개
-    const named = DB.contacts.filter(c => c.name && c.name.length >= 2 && q.includes(c.name));
-    if (named.length && !/누구|사람|명/.test(q.replace(named[0].name, ""))) {
-      return { text: named.length === 1 ? null : `이름이 같은 사람이 ${named.length}명 있습니다.`, how: [`이름 '${named[0].name}'`], people: named, profile: named.length === 1 ? named[0] : null };
-    }
-    // 2) 회사
-    const companies = [...new Set(DB.contacts.map(c => c.company).filter(Boolean))];
-    const hitCo = companies.filter(co => norm(co).length >= 2 && qn.includes(norm(co)));
-    if (hitCo.length) { const set = new Set(hitCo.map(norm)); list = list.filter(c => set.has(norm(c.company))); how.push(`회사: ${hitCo.join(", ")}`); }
-    // 3) 직무·직급
-    const roles = Object.entries(ROLE_TRIGGERS).filter(([, ws]) => ws.some(w => askHas(q, w))).map(([r]) => r);
-    if (roles.length) { list = list.filter(c => roles.some(r => ROLES[r].some(w => roleHit(c, w)))); how.push(`직무: ${roles.join(", ")}`); }
-    // 4) 태그 (#태그 또는 태그 이름 그대로)
-    const tags = [...new Set(DB.contacts.flatMap(c => c.tags || []))];
-    const hitTags = tags.filter(t => q.includes(t));
-    if (hitTags.length) { list = list.filter(c => hitTags.every(t => (c.tags || []).includes(t))); how.push(`태그: ${hitTags.join(", ")}`); }
-    // 5) 시간 조건
-    const days = parseDays(q);
-    if (/연락.*(안|못|없)|안\s*만난|못\s*만난|소홀|오래/.test(q)) {
-      const lim = days || 90;
-      list = list.filter(c => { const l = lastContact(c); return !l || daysBetween(l, today()) >= lim; });
-      how.push(`마지막 연락이 ${lim}일 넘었거나 기록 없음`);
-    } else if (/최근|요즘|지난|이번\s*달/.test(q) && /(만난|연락|미팅|통화)/.test(q)) {
-      const lim = days || (/이번\s*주/.test(q) ? 7 : 30);
-      list = list.filter(c => { const l = lastContact(c); return l && daysBetween(l, today()) <= lim; });
-      how.push(`최근 ${lim}일 안에 연락`);
-    }
-    if (/(연락할|챙길|팔로|후속|약속|예정|할\s*일)/.test(q)) {
-      const lim = /이번\s*주|일주일/.test(q) ? 7 : /이번\s*달|한\s*달/.test(q) ? 30 : 0;
-      const end = new Date(); end.setDate(end.getDate() + lim);
-      const e = end.toISOString().slice(0, 10);
-      list = list.filter(c => c.nextAt && c.nextAt <= e);
-      how.push(lim ? `다음 연락일이 ${lim}일 안` : "다음 연락일이 오늘이거나 지남");
-    }
-    // 6) 아무 조건도 못 찾으면 낱말 검색
-    if (!how.length) {
-      const words = q.split(/\s+/).map(norm).filter(w => w.length >= 2 && !/^(누구|사람|알려|찾아|있어|있나|보여|목록|명함)/.test(w));
-      if (words.length) {
-        list = list.filter(c => { const blob = norm(Object.values({ a: c.name, b: c.company, d: c.dept, t: c.title, n: c.notes, m: c.cardMemo, g: (c.tags || []).join(" "), l: (c.logs || []).map(x => x.t).join(" ") }).join(" ")); return words.some(w => blob.includes(w)); });
-        how.push(`낱말 검색: ${words.join(", ")}`);
-      } else return { text: "질문에서 회사, 직무, 태그, 기간을 찾지 못했습니다. 아래 예시처럼 물어보세요.", how: [], people: [] };
-    }
-    list.sort((a, b) => String(lastContact(b) || "").localeCompare(String(lastContact(a) || "")) || String(a.name).localeCompare(String(b.name), "ko"));
-    const count = list.length;
-    const text = count ? `${count}명을 찾았습니다.` + (/몇\s*명/.test(q) ? "" : count > 20 ? " 앞의 20명만 보여 드립니다." : "") : "조건에 맞는 사람이 없습니다.";
-    return { text, how, people: list.slice(0, 20) };
-  }
-
   /* ---------- 지식 검색: 기기 안 벡터 검색 ----------
      글을 한글 두 글자 조각과 낱말로 쪼개 TF-IDF 벡터로 만들고, 질문 벡터와의 코사인 유사도로 가까운 문단을 찾는다.
      외부 AI 모델 없이 동작하므로 데이터가 기기 밖으로 나가지 않는다. 대신 뜻이 비슷해도 글자가 전혀 다르면 찾지 못한다. */
-  const STOP = new Set(["그리고", "하지만", "있습니다", "합니다", "입니다", "있는", "하는", "에서", "으로", "에게", "누구", "무엇", "뭐야", "알려", "알려줘", "어떻게", "어디", "언제", "있어", "있나요", "인가요", "뭔가요"]);
+  const STOP = new Set(["그리고", "하지만", "있습니다", "합니다", "입니다", "있는", "하는", "에서", "으로", "에게", "누구", "무엇", "뭐야", "알려", "알려줘", "어떻게", "어디", "언제", "있어", "있나요", "인가요", "뭔가요", "사람", "사람은", "사람이", "아는", "알고", "쪽", "분", "분들", "누가", "좀", "해줘", "해", "줘", "어떤", "관련", "대해", "대해서", "누구야", "누구지", "누구예요", "누군가요", "있을까", "있을까요", "알아", "아세요"]);
   function tokens(text) {
     const out = [];
     for (const w of String(text).toLowerCase().match(/[a-z0-9]+|[가-힣]+/g) || []) {
@@ -379,7 +295,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     const df = new Map();
     const tfs = chunks.map(c => {
       const tf = new Map();
-      for (const t of [...tokens(c.title), ...tokens(c.title), ...tokens(c.text)]) tf.set(t, (tf.get(t) || 0) + 1);
+      for (const t of [...tokens(c.title), ...tokens(c.title), ...tokens(c.text), ...tokens(c.extra || "")]) tf.set(t, (tf.get(t) || 0) + 1);
       for (const t of tf.keys()) df.set(t, (df.get(t) || 0) + 1);
       return tf;
     });
@@ -391,20 +307,35 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     const cos = (a, b) => { let d = 0; const [x, y] = a.size < b.size ? [a, b] : [b, a]; for (const [t, w] of x) d += w * (y.get(t) || 0); return d; };
     return {
       size: N,
-      search(q, k = 4) {
+      search(q, k = 5) {
         const qv = embed(q); if (!qv.size) return [];
-        return chunks.map((c, i) => ({ c, score: cos(qv, vecs[i]) })).filter(r => r.score >= 0.12).sort((a, b) => b.score - a.score).slice(0, k)
+        return chunks.map((c, i) => ({ c, score: cos(qv, vecs[i]) })).filter(r => r.score >= 0.1).sort((a, b) => b.score - a.score).slice(0, k)
           .map(r => ({ ...r, best: r.c.sents.map(t => ({ t, s: cos(qv, embed(t)) })).sort((a, b) => b.s - a.s) }));
       }
     };
   }
+  /* 직책·부서에서 직무 낱말을 더해 명함 문서를 검색하기 쉽게 만든다. CFO에는 '임원 재무'를, IT전략팀에는 'IT 정보기술'을 붙인다. */
+  const ROLE_WORDS = [
+    [/대표|ceo|사장|부사장|전무|상무|이사|임원|본부장|cfo|cto|coo|cio|파트너|실장/i, "임원 경영진 의사결정자"],
+    [/재무|회계|경리|자금|cfo|ir|세무|감사|finance/i, "재무 회계 재무담당"],
+    [/영업|세일즈|sales|사업개발|판매/i, "영업 세일즈 영업담당"],
+    [/마케팅|marketing|홍보|브랜드/i, "마케팅 홍보"],
+    [/인사|hr|채용|총무/i, "인사 채용 HR"],
+    [/(^|[^a-z])it([^a-z]|$)|전산|정보|개발|cto|cio|시스템|보안|디지털|dx/i, "IT 정보기술 전산 개발"],
+    [/구매|조달|purchasing|소싱/i, "구매 조달"],
+    [/법무|legal|컴플라이언스|준법/i, "법무 컴플라이언스"],
+    [/생산|제조|품질|공장/i, "생산 제조 품질"],
+    [/기획|전략|경영지원|조정/i, "기획 전략"]
+  ];
+  const roleWords = c => ROLE_WORDS.filter(([re]) => re.test(`${c.title || ""} ${c.dept || ""}`)).map(([, w]) => w).join(" ");
+
   /* 검색 대상 문서. 시연 모드에서는 공개 지식만, 개인용에서는 개인정보 지식과 명함(사람 카드)까지 넣는다. */
   function kbDocs(scope) {
     const docs = DB.kb.public.map(e => ({ id: e.id, title: e.title, text: e.text, src: "public" }));
     if (scope === "full") {
       docs.push(...DB.kb.private.map(e => ({ id: e.id, title: e.title, text: e.text, src: "private" })));
       docs.push(...DB.contacts.map(c => ({ id: c.id, person: true, src: "card", title: `${c.name || ""} ${c.company || ""}`.trim(),
-        text: [[c.company, c.dept, c.title].filter(Boolean).join(" ") + ".", (c.tags || []).length ? "태그 " + c.tags.join(", ") + "." : "", c.notes || "", ...(c.logs || []).map(l => `${l.d} ${l.t}`)].filter(Boolean).join("\n") })));
+        extra: roleWords(c), text: [[c.company, c.dept, c.title].filter(Boolean).join(" ") + ".", (c.tags || []).length ? "태그 " + c.tags.join(", ") + "." : "", c.notes || "", ...(c.logs || []).map(l => `${l.d} ${l.t}`)].filter(Boolean).join("\n") })));
     }
     return docs;
   }
@@ -434,18 +365,30 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     return [...new Set([...hits, ...(names.length ? [`사람 이름(${names.slice(0, 3).join(", ")})`] : [])])];
   }
 
-  /* 질문 하나에 대한 전체 답: 사람 규칙 답(개인용만) + 지식 검색 답 */
+  /* 입력 하나를 두 갈래로 나눈다.
+     - 사람 이름(또는 이름 + 님/직함, 회사 이름만)이면 기본정보 카드만 보여 준다.
+     - 그 밖의 구체적인 질문은 벡터 검색으로 지식과 명함 메모·기록에서 찾아 답한다. */
+  const TITLES = "님|씨|팀장|부장|과장|대리|차장|실장|상무|전무|이사|대표|파트너|매니저|사원|주임|본부장|사장|프로|책임|선임|수석";
+  function classify(input) {
+    const t = input.trim().replace(/[?？!.]+$/, "");
+    if (!t || !DB.contacts.length) return { kind: "question" };
+    const rest = new RegExp(`^\\s*(${TITLES})?\\s*(님)?\\s*(정보|연락처|누구)?\\s*$`);
+    const byName = DB.contacts.filter(c => c.name && c.name.length >= 2 && t.startsWith(c.name) && rest.test(t.slice(c.name.length)));
+    if (byName.length) return { kind: "person", people: byName };
+    if (/^[가-힣]{2,4}$/.test(t)) { const pre = DB.contacts.filter(c => c.name && c.name.startsWith(t)); if (pre.length) return { kind: "person", people: pre }; }
+    const byCo = DB.contacts.filter(c => c.company && norm(c.company) === norm(t.replace(/\s*(사람|직원|명함|목록|분들)$/, "")));
+    if (byCo.length) return { kind: "company", people: byCo };
+    return { kind: "question" };
+  }
   function respond(q) {
     if (demo()) {
-      const idx = buildIndex(kbDocs("demo"));
-      const hits = idx.search(q);
-      const personal = /전화|연락처|번호|이메일|메일 주소|주소|누구|사람|담당자/.test(q);
-      return { mode: "demo", kb: hits, people: null, note: personal ? "시연 모드에서는 사람과 연락처 정보를 답하지 않습니다. 공개 지식에서 찾은 내용만 보여 드립니다." : null };
+      const hits = buildIndex(kbDocs("demo")).search(q);
+      const personal = /전화|연락처|번호|이메일|메일 주소|주소|담당자/.test(q);
+      return { mode: "demo", kb: hits, note: personal ? "시연 모드에서는 사람과 연락처 정보를 답하지 않습니다. 공개 지식에서 찾은 내용만 보여 드립니다." : null };
     }
-    const ruled = DB.contacts.length ? answer(q) : null;
-    const strong = ruled && (ruled.profile || (ruled.how.length && !ruled.how[0].startsWith("낱말")));
-    const hits = buildIndex(kbDocs("full")).search(q);
-    return { mode: "full", kb: hits, people: strong ? ruled : (hits.length ? null : ruled) };
+    const cls = classify(q);
+    if (cls.kind !== "question") return { mode: "full", basic: cls.people, kind: cls.kind };
+    return { mode: "full", kb: buildIndex(kbDocs("full")).search(q) };
   }
 
   /* ---------- 화면 조각 ---------- */
@@ -465,7 +408,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     if (m === MODE) return;
     if (m === "full" && !confirm("개인용으로 바꾸면 명함과 개인정보가 화면에 나옵니다. 주변에 보는 사람이 없나요?")) return;
     MODE = m; try { localStorage.setItem(MODE_KEY, m); } catch { /* 저장 못 해도 이번 화면에는 적용 */ }
-    S.chat = []; if (!allowed(S.route)) { go("ask"); return; } render();
+    S.chat = []; if (!allowed(S.route)) { go("find"); return; } render();
   }
   function modeSwitch() {
     return h("div", { class: "mode", role: "group", "aria-label": "답변 범위" },
@@ -473,13 +416,13 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
       h("button", { "aria-pressed": String(!demo()), onclick: () => setMode("full") }, "개인용 (개인정보 포함)"));
   }
   function header(title, sub) {
-    const tabs = demo() ? [["ask", "묻기"], ["kb", "지식"]] : [["people", "사람"], ["ask", "묻기"], ["kb", "지식"], ["import", "가져오기"]];
+    const tabs = demo() ? [["find", "찾기"], ["kb", "지식"]] : [["find", "찾기"], ["kb", "지식"], ["import", "가져오기"]];
     return [
       h("div", { class: "bar" }, h("a", { class: "back", href: "../../" }, "← 공부방"), DB.sample ? h("span", { class: "tag" }, "샘플 데이터") : null),
       demo() ? h("div", { class: "demo-banner", role: "status" }, "시연 모드: 사람·연락처 화면을 숨기고, 답에서 이름·전화·이메일을 가립니다.") : null,
       h("div", null, h("h1", null, title), sub ? h("p", { class: "muted small" }, sub) : null),
       h("nav", { class: "tabs", style: `--tabs:${tabs.length}`, "aria-label": "Connect 메뉴" }, tabs.map(([r, l]) =>
-        h("button", { "aria-current": (S.route === r || (r === "people" && S.route === "person")) ? "page" : null, onclick: () => go(r) }, l))),
+        h("button", { "aria-current": (S.route === r || (r === "find" && S.route === "person")) ? "page" : null, onclick: () => go(r) }, l))),
       S.msg ? h("div", { class: "note bad", role: "alert" }, S.msg) : null
     ];
   }
@@ -494,31 +437,60 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
         h("button", { class: "btn ghost", onclick: loadSample }, "샘플로 둘러보기")));
   }
 
-  function viewPeople() {
-    const all = DB.contacts;
-    if (!all.length) return [header("Connect", "명함 속 사람과 관계를 한곳에서"), viewEmpty()];
-    const qn = norm(S.q);
-    let list = all.filter(c => !qn || norm([c.name, c.company, c.dept, c.title, (c.tags || []).join(" "), c.email].join(" ")).includes(qn));
-    if (S.filter === "due") list = list.filter(isDue);
-    else if (S.filter === "cold") list = list.filter(c => { const l = lastContact(c); return !l || daysBetween(l, today()) >= 90; });
-    else if (S.filter.startsWith("tag:")) list = list.filter(c => (c.tags || []).includes(S.filter.slice(4)));
-    const tags = [...new Set(all.flatMap(c => c.tags || []))].sort();
-    const due = all.filter(isDue).length;
-    // 회사별로 묶는다
-    const groups = new Map();
-    for (const c of list.sort((a, b) => String(a.company || "~").localeCompare(String(b.company || "~"), "ko") || String(a.name).localeCompare(String(b.name), "ko"))) {
-      const k = c.company || "회사 없음"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c);
-    }
-    const listEl = h("div", { class: "stack", id: "plist" },
-      list.length ? [...groups].slice(0, 80).map(([co, ps]) => h("section", { class: "stack", style: "gap:6px" }, h("h3", null, `${co} `, h("span", { class: "muted small" }, `${ps.length}명`)), ps.map(personRow)))
-        : h("p", { class: "muted" }, "조건에 맞는 사람이 없습니다."),
-      groups.size > 80 ? h("p", { class: "muted small" }, "회사가 많아 앞의 80곳만 보여 드립니다. 검색으로 좁혀 보세요.") : null);
-    return [header("Connect", `${all.length}명 · ${new Set(all.map(c => c.company).filter(Boolean)).size}개 회사` + (due ? ` · 연락할 사람 ${due}명` : "")),
-      h("input", { type: "search", placeholder: "이름, 회사, 직책, 태그로 찾기", "aria-label": "사람 찾기", value: S.q, oninput: e => { S.q = e.target.value; const y = scrollY; render(); scrollTo(0, y); document.querySelector('input[type="search"]')?.focus(); } }),
-      h("div", { class: "chips", role: "group", "aria-label": "걸러 보기" },
-        [["all", "전체"], ["due", `연락할 때 ${due}`], ["cold", "90일 넘게 연락 없음"], ...tags.map(t => ["tag:" + t, "#" + t])].map(([k, l]) =>
+  function basicCard(c) {
+    const l = lastContact(c), dial = v => v.replace(/[^\d+]/g, "");
+    return h("article", { class: "entry" },
+      h("div", { class: "row" }, avatar(c), h("div", { style: "flex:1;min-width:0" },
+        h("strong", null, c.name || "(이름 없음)"), " ",
+        h("span", { class: "small muted" }, [c.company, c.dept, c.title].filter(Boolean).join(" · ")))),
+      h("dl", null,
+        c.mobile ? [h("dt", null, "휴대폰"), h("dd", null, h("a", { href: "tel:" + dial(c.mobile) }, c.mobile))] : null,
+        c.phone ? [h("dt", null, "전화"), h("dd", null, h("a", { href: "tel:" + dial(c.phone) }, c.phone))] : null,
+        c.email ? [h("dt", null, "이메일"), h("dd", null, h("a", { href: "mailto:" + c.email }, c.email))] : null,
+        [h("dt", null, "마지막 연락"), h("dd", null, l ? `${l} (${daysBetween(l, today())}일 전)` : "기록 없음")],
+        c.nextAt ? [h("dt", null, "다음 연락"), h("dd", null, c.nextAt + (isDue(c) ? " · 연락할 때" : ""))] : null),
+      (c.tags || []).length ? h("div", { class: "row" }, c.tags.map(t => h("span", { class: "tag" }, t))) : null,
+      h("button", { class: "back small", onclick: () => go("p-" + c.id) }, "기록·메모 보기와 고치기"));
+  }
+
+  /* 찾기: 입력창 하나. 이름이면 기본정보, 질문이면 벡터 검색. 비어 있으면 사람 목록을 걸러 본다. */
+  const DEMO_EX = ["IFRS 18은 언제부터 적용해?", "진단 컨설팅 단가는?", "우리 팀 서비스 소개해 줘"];
+  function viewFind() {
+    const send = q => { if (!q.trim()) return; S.chat.push({ me: q }, { bot: respond(q) }); S.q = ""; render(); setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0); };
+    const nothing = !DB.contacts.length && !DB.kb.public.length && !DB.kb.private.length;
+    const live = !demo() && S.q.trim() ? classify(S.q) : null;
+    const all = DB.contacts, due = all.filter(isDue).length;
+    let browse = null;
+    if (!demo() && !S.q.trim() && !S.chat.length && all.length) {
+      let list = all;
+      if (S.filter === "due") list = list.filter(isDue);
+      else if (S.filter === "cold") list = list.filter(c => { const l = lastContact(c); return !l || daysBetween(l, today()) >= 90; });
+      else if (S.filter.startsWith("tag:")) list = list.filter(c => (c.tags || []).includes(S.filter.slice(4)));
+      else if (S.filter !== "all") list = [];
+      const tags = [...new Set(all.flatMap(c => c.tags || []))].sort();
+      browse = [h("div", { class: "chips", role: "group", "aria-label": "사람 걸러 보기" },
+        [["none", "목록 숨기기"], ["all", `전체 ${all.length}`], ["due", `연락할 때 ${due}`], ["cold", "90일 넘게 연락 없음"], ...tags.map(t => ["tag:" + t, "#" + t])].map(([k, l]) =>
           h("button", { class: "chip", "aria-pressed": String(S.filter === k), onclick: () => { S.filter = k; render(); } }, l))),
-      listEl];
+        S.filter !== "none" ? h("div", { class: "stack" }, list.slice(0, 50).map(personRow), list.length > 50 ? h("p", { class: "muted small" }, `앞의 50명만 보여 드립니다. 이름이나 회사를 입력해 찾으세요.`) : null, !list.length ? h("p", { class: "muted small" }, "해당하는 사람이 없습니다.") : null) : null];
+    }
+    return [header("Connect", demo() ? "공개 지식만 보고 답합니다. 개인정보는 가립니다." : `${all.length}명 · 지식 ${DB.kb.public.length + DB.kb.private.length}개` + (due ? ` · 연락할 사람 ${due}명` : "")),
+      modeSwitch(),
+      nothing ? viewEmpty() : null,
+      h("div", { class: "stack" }, S.chat.map(m => m.me ? h("div", { class: "msg me" }, demo() ? redact(m.me) : m.me) : botMsg(m.bot))),
+      h("form", { class: "row", onsubmit: e => { e.preventDefault(); send(S.q); } },
+        h("input", { style: "flex:1", id: "q", autocomplete: "off", placeholder: demo() ? "질문 (예: IFRS 18은 언제부터?)" : "이름 또는 질문 (예: 김하늘 / ERP 예산 언제 확정해?)", "aria-label": "이름 또는 질문", value: S.q,
+          oninput: e => { const before = classify(S.q).kind; S.q = e.target.value; if (demo()) return; const after = S.q.trim() ? classify(S.q).kind : "empty"; if (before !== after || after !== "question") { render(); const el = document.getElementById("q"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); } } }),
+        h("button", { class: "btn", type: "submit" }, "찾기")),
+      live && live.kind !== "question" ? h("div", { class: "stack" },
+        h("p", { class: "how" }, live.kind === "company" ? `${live.people[0].company} 사람 ${live.people.length}명 (기본정보)` : `이름이 맞는 사람 ${live.people.length}명 (기본정보)`),
+        live.people.slice(0, 20).map(basicCard)) : null,
+      live && live.kind === "question" ? h("p", { class: "muted small" }, "질문으로 보고 지식과 기록에서 찾습니다. '찾기'를 누르세요.") : null,
+      demo() ? h("div", { class: "chips" }, DEMO_EX.map(x => h("button", { class: "chip", onclick: () => send(x) }, x))) : null,
+      S.chat.length ? h("button", { class: "back small", onclick: () => { S.chat = []; render(); } }, "대화 지우기") : null,
+      browse,
+      h("p", { class: "muted small" }, demo()
+        ? "시연용은 '지식' 탭의 공개 지식에서 가장 가까운 문단을 찾아 답하고, 이름·전화·이메일은 가립니다."
+        : "사람 이름을 치면 기본정보만 보여 줍니다. 구체적인 질문은 지식(공개·개인정보)과 명함의 메모·기록을 벡터 검색해 가장 가까운 문장으로 답합니다.")];
   }
 
   function viewPerson() {
@@ -557,41 +529,28 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
       h("section", { class: "card" },
         h("h3", null, "메모"),
         h("textarea", { "aria-label": "메모", value: c.notes || "", placeholder: "관심사, 소개해 준 사람, 주의할 점 등", onchange: e => { c.notes = e.target.value; saveC(); } })),
-      h("button", { class: "btn danger", onclick: () => { if (confirm(`${c.name}님을 지울까요? 기록도 함께 지워집니다.`)) { DB.contacts = DB.contacts.filter(x => x !== c); save(); go("people"); } } }, "이 사람 지우기")];
+      h("button", { class: "btn danger", onclick: () => { if (confirm(`${c.name}님을 지울까요? 기록도 함께 지워집니다.`)) { DB.contacts = DB.contacts.filter(x => x !== c); save(); go("find"); } } }, "이 사람 지우기")];
   }
 
-  const EXAMPLES = ["재무 쪽 아는 사람", "가온테크 사람 누구 있어?", "3개월 넘게 연락 안 한 고객사", "이번 주 연락할 사람", "임원 몇 명이야?"];
-  const KB_EXAMPLES = ["IFRS 18은 언제부터 적용해?", "진단 컨설팅 단가는?", "우리 팀 서비스 소개해 줘"];
-  function viewAsk() {
-    const send = q => { if (!q.trim()) return; S.chat.push({ me: q }, { bot: respond(q) }); S.ask = ""; render(); setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0); };
-    const ex = demo() ? KB_EXAMPLES : [...(DB.contacts.length ? (DB.sample ? EXAMPLES : EXAMPLES.filter(x => !x.includes("가온테크"))) : []), ...(DB.kb.public.length + DB.kb.private.length ? KB_EXAMPLES.filter(x => DB.sample || !/진단|우리 팀/.test(x)) : [])];
-    const nothing = !DB.contacts.length && !DB.kb.public.length && !DB.kb.private.length;
-    return [header("묻기", demo() ? "공개 지식만 보고 답합니다. 개인정보는 가립니다." : "명함, 기록, 공개·개인정보 지식을 모두 보고 답합니다. 질문은 기기 밖으로 보내지 않습니다."),
-      modeSwitch(),
-      nothing ? viewEmpty() : null,
-      h("div", { class: "stack" }, S.chat.map(m => m.me ? h("div", { class: "msg me" }, demo() ? redact(m.me) : m.me) : botMsg(m.bot))),
-      h("div", { class: "chips" }, ex.map(x => h("button", { class: "chip", onclick: () => send(x) }, x))),
-      h("form", { class: "row", onsubmit: e => { e.preventDefault(); send(S.ask); } },
-        h("input", { style: "flex:1", placeholder: demo() ? "예: IFRS 18은 언제부터?" : "예: 누리바이오 재무 담당은?", "aria-label": "질문", value: S.ask, oninput: e => { S.ask = e.target.value; } }),
-        h("button", { class: "btn", type: "submit" }, "묻기")),
-      S.chat.length ? h("button", { class: "back small", onclick: () => { S.chat = []; render(); } }, "대화 지우기") : null,
-      h("p", { class: "muted small" }, demo()
-        ? "시연용은 '지식' 탭의 공개 지식에서 가장 가까운 문단을 찾아 답합니다. 사람 이름, 전화번호, 이메일은 가립니다."
-        : "개인용은 사람 규칙(회사, 직무, 태그, 기간, 이름)과 지식 검색(공개·개인정보 지식, 명함 메모와 기록)을 함께 씁니다.")];
-  }
   function srcTag(src) {
     return src === "public" ? h("span", { class: "src" }, "공개") : src === "private" ? h("span", { class: "src priv" }, "개인정보") : h("span", { class: "src priv" }, "명함");
   }
   function botMsg(a) {
-    // 예전 형식(사람 규칙 답만 있던 대화)
-    if (!a.mode) return peopleMsg(a);
-    const out = (a.mode === "demo") ? redact : (x => x);
+    if (!a.mode) return h("div", { class: "msg bot" }, h("p", { class: "small muted" }, "이전 형식의 답입니다. 대화를 지우고 다시 물어보세요."));
+    const out = a.mode === "demo" ? redact : (x => x);
     const parts = [];
     if (a.note) parts.push(h("p", { class: "small" }, a.note));
-    if (a.people) parts.push(peopleMsg(a.people));
-    if (a.kb.length) {
+    if (a.basic) {
+      parts.push(h("div", { class: "msg bot stack" },
+        h("p", { class: "how" }, a.kind === "company" ? `${a.basic[0].company} 사람 ${a.basic.length}명 (기본정보)` : "기본정보"),
+        a.basic.slice(0, 20).map(basicCard)));
+    } else if (a.kb && a.kb.length) {
       const top = a.kb[0];
-      const lead = top.best.slice(0, 2).filter((x, i) => i === 0 || x.s >= top.best[0].s * 0.6).map(x => x.t).join(" ");
+      // 가장 가까운 근거가 명함이면 사람 목록으로, 지식이면 가장 가까운 문장으로 답한다.
+      const cardHits = a.kb.filter(r => r.c.person);
+      const lead = top.c.person
+        ? `관련 있는 사람: ${cardHits.map(r => { const c = byId(r.c.id); return c ? `${c.name}(${[c.company, c.title].filter(Boolean).join(" ")})` : r.c.title; }).join(", ")}`
+        : top.best.slice(0, 2).filter((x, i) => i === 0 || x.s >= top.best[0].s * 0.6).map(x => x.t).join(" ");
       parts.push(h("div", { class: "msg bot stack" },
         h("p", null, out(lead)),
         h("p", { class: "how" }, "근거 (가까운 순)"),
@@ -599,26 +558,10 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
           h("div", { class: "row" }, srcTag(r.c.src), h("strong", { class: "small" }, out(r.c.title)), h("span", { class: "score" }, `유사도 ${Math.round(r.score * 100)}%`)),
           h("p", { class: "small" }, out(r.c.text)),
           r.c.person && a.mode === "full" ? h("button", { class: "back small", onclick: () => go("p-" + r.c.id) }, "사람 보기") : null))));
-    } else if (!a.people) {
-      parts.push(h("div", { class: "msg bot" }, h("p", null, a.mode === "demo" ? "공개 지식에서 관련 내용을 찾지 못했습니다. '지식' 탭에 공개해도 되는 내용을 더 넣어 주세요." : "명함과 지식에서 관련 내용을 찾지 못했습니다. 다른 낱말로 물어보거나 '지식' 탭에 내용을 더 넣어 주세요.")));
+    } else {
+      parts.push(h("div", { class: "msg bot" }, h("p", null, a.mode === "demo" ? "공개 지식에서 관련 내용을 찾지 못했습니다. '지식' 탭에 공개해도 되는 내용을 더 넣어 주세요." : "지식과 기록에서 관련 내용을 찾지 못했습니다. 다른 낱말로 묻거나 '지식' 탭이나 사람의 기록·메모에 내용을 더 넣어 주세요.")));
     }
     return h("div", { class: "stack" }, parts);
-  }
-  function peopleMsg(a) {
-    if (a.profile) {
-      const c = a.profile, l = lastContact(c), recent = (c.logs || []).slice().sort((x, y) => y.d.localeCompare(x.d)).slice(0, 3);
-      return h("div", { class: "msg bot stack" },
-        h("p", null, h("strong", null, c.name), ` 님은 ${[c.company, c.dept, c.title].filter(Boolean).join(" ") || "회사 정보가 없는 분"}입니다.`),
-        h("p", { class: "small" }, l ? `마지막 연락은 ${l}(${daysBetween(l, today())}일 전)입니다.` : "아직 연락 기록이 없습니다.", c.nextAt ? ` 다음 연락 예정일은 ${c.nextAt}입니다.` : ""),
-        (c.tags || []).length ? h("p", { class: "small" }, "태그: ", c.tags.map(t => h("span", { class: "tag" }, t))) : null,
-        recent.length ? h("div", { class: "stack", style: "gap:4px" }, recent.map(g => h("div", { class: "log" }, h("time", null, g.d), h("p", { class: "small" }, g.t)))) : null,
-        c.notes ? h("p", { class: "small" }, "메모: " + c.notes) : null,
-        h("button", { class: "btn ghost", onclick: () => go("p-" + c.id) }, "자세히 보기"));
-    }
-    return h("div", { class: "msg bot stack" },
-      a.text ? h("p", null, a.text) : null,
-      a.how.length ? h("p", { class: "how" }, "이렇게 이해했어요: " + a.how.join(" · ")) : null,
-      a.people.map(personRow));
   }
 
   /* ---------- 지식 탭: 공개 지식과 개인정보 지식 두 저장소 ---------- */
@@ -736,8 +679,8 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
   }
 
   function render() {
-    if (!allowed(S.route)) { S.route = "ask"; if (location.hash !== "#ask") history.replaceState(null, "", "#ask"); }
-    const view = S.route === "person" ? viewPerson() : S.route === "ask" ? viewAsk() : S.route === "kb" ? viewKb() : S.route === "import" ? viewImport() : viewPeople();
+    if (!allowed(S.route)) { S.route = "find"; history.replaceState(null, "", "#find"); }
+    const view = S.route === "person" ? viewPerson() : S.route === "kb" ? viewKb() : S.route === "import" ? viewImport() : viewFind();
     app.replaceChildren(...[view].flat(Infinity).filter(Boolean));
     if (S.route !== "import") S.flash = "";
   }
