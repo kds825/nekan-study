@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Connect</title>
-<meta name="description" content="리멤버에서 내보낸 명함을 이 기기 안에서만 정리하고, 사람과 회사를 묻고 찾는 인맥 앱.">
+<meta name="description" content="명함을 찍거나 리멤버에서 내보낸 파일을 올려 이 기기 안에서만 정리하고, 사람과 회사를 묻고 찾는 인맥 앱.">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0d6b66">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='12' r='5' fill='%230d6b66'/%3E%3Ccircle cx='22' cy='12' r='5' fill='none' stroke='%230d6b66' stroke-width='2.5'/%3E%3Cpath d='M3 27c1-5 4-7 8-7s7 2 8 7' fill='%230d6b66'/%3E%3C/svg%3E">
@@ -35,7 +35,7 @@ body {
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 24px 24px;
 }
-#app { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 16px; }
+#app { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 104px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 16px; }
 h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.25; margin: 0; }
 h1 { font-size: 2rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
 p { margin: 0; }
@@ -86,6 +86,14 @@ th, td { border: 1px solid var(--line); padding: 4px 8px; white-space: nowrap; t
 .score { font: 500 .75rem var(--mono); color: var(--muted); }
 .entry { padding: 12px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; }
 .entry .body { white-space: pre-wrap; font-size: .92rem; }
+.fab { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(20px, env(safe-area-inset-bottom, 0px)); z-index: 5; min-height: 56px; padding: 0 22px; border-radius: 28px; background: var(--accent); color: var(--accent-ink); font: 400 1.15rem var(--display); display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 18px rgb(0 0 0 / .28); cursor: pointer; }
+.fab:hover { outline: 3px solid var(--mark); outline-offset: 2px; }
+.progress { height: 8px; border-radius: 4px; background: var(--grid); overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+.scanimg { width: 100%; max-height: 260px; object-fit: contain; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface); }
+.form2 { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.form2 label { font-size: .9rem; color: var(--muted); }
+details > summary { cursor: pointer; font-weight: 500; }
 mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-radius: 2px; }
 </style>
 </head>
@@ -95,7 +103,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
 (() => {
   const KEY = "connect-data-v1";
   const app = document.getElementById("app");
-  const S = { route: "find", pid: null, q: "", filter: "none", chat: [], ask: "", importState: null, msg: "", editing: false,
+  const S = { scan: null, route: "find", pid: null, q: "", filter: "none", chat: [], ask: "", importState: null, msg: "", editing: false,
     kbQ: "", kbEdit: null, kbDraft: { title: "", text: "", tags: "" } };
   let DB = { version: 1, contacts: [], importedAt: null, sample: false, kb: { items: [] } };
   try { localStorage.removeItem("connect-mode-v1"); } catch { /* 예전 시연·개인 모드 설정은 더 쓰지 않는다 */ }
@@ -113,7 +121,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     for (const c of kids.flat(Infinity)) if (c !== null && c !== undefined && c !== false) el.append(c);
     return el;
   }
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };   // 이 기기 시간대의 날짜
   const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
   const norm = s => String(s ?? "").toLowerCase().replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|inc\.?|co\.?,?\s*ltd\.?|corp\.?|corporation|limited/g, "").replace(/[\s.,·\-_()]/g, "");
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -142,11 +150,11 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
   function parseHash() {
     const r = location.hash.slice(1);
     if (r.startsWith("p-")) return { route: "person", pid: r.slice(2) };
-    if (["import", "kb"].includes(r)) return { route: r };
+    if (["import", "kb", "scan"].includes(r)) return { route: r };
     return { route: "find" };   // 예전 #people, #ask 주소도 찾기 화면으로
   }
   function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else render(); }
-  window.addEventListener("hashchange", () => { Object.assign(S, parseHash(), { editing: false }); render(); window.scrollTo(0, 0); });
+  window.addEventListener("hashchange", () => { Object.assign(S, parseHash(), { editing: false }); if (S.route !== "scan" && S.scan?.status === "saved") S.scan = null; render(); window.scrollTo(0, 0); });
 
   /* ---------- 엑셀·CSV 읽기 ---------- */
   let xlsxReady;
@@ -225,6 +233,239 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     DB.importedAt = now;
     return { added, updated };
   }
+
+
+  /* ---------- 명함 촬영: 기기 안 글자 인식(OCR) ----------
+     사진은 서버로 보내지 않고 이 브라우저 안에서 Tesseract.js(vendor/ocr)로 한국어·영어 글자를 읽은 뒤, 아래 규칙(parseCard)으로 칸을 나눈다.
+     사진 자체는 저장하지 않고, 사용자가 확인한 연락처만 저장한다. 글자 데이터는 브라우저 HTTP 캐시에만 두고 앱 저장소는 쓰지 않는다(cacheMethod: none). */
+  const OCR_BASE = new URL("vendor/ocr/", location.href).href;
+  const OCR_STEP = { "loading tesseract core": "글자 인식 엔진을 준비하는 중", "initializing tesseract": "글자 인식 엔진을 준비하는 중",
+    "loading language traineddata": "한글·영문 글자 데이터를 받는 중 (처음 한 번은 오래 걸립니다)", "initializing api": "글자 인식 엔진을 준비하는 중", "recognizing text": "명함 글자를 읽는 중" };
+  let ocrWorker = null;
+  function loadScript(src) {
+    return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => fail(new Error("글자 인식 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.")); document.head.append(s); });
+  }
+  function paintProgress() {
+    const st = document.getElementById("scanstep"), bar = document.getElementById("scanbar");
+    if (st && S.scan) st.textContent = S.scan.step;
+    if (bar && S.scan) bar.style.width = Math.round((S.scan.progress || 0) * 100) + "%";
+  }
+  function onOcr(m) {
+    const sc = S.scan; if (!sc || sc.status !== "reading") return;
+    if (OCR_STEP[m.status]) sc.step = OCR_STEP[m.status];
+    const p = typeof m.progress === "number" ? m.progress : 0;
+    sc.progress = m.status === "recognizing text" ? ((sc.pass || 0) + p) / OCR_PASSES.length : p;
+    paintProgress();
+  }
+  function getOcr() {
+    if (!ocrWorker) {
+      ocrWorker = (async () => {
+        if (!window.Tesseract) await loadScript(OCR_BASE + "tesseract.min.js");
+        const w = await window.Tesseract.createWorker(["kor", "eng"], 1, { workerPath: OCR_BASE + "worker.min.js", corePath: OCR_BASE + "core", langPath: OCR_BASE + "lang", cacheMethod: "none", logger: onOcr });
+        await w.setParameters({ tessedit_pageseg_mode: "3", preserve_interword_spaces: "1" });
+        return w;
+      })();
+      ocrWorker.catch(() => { ocrWorker = null; });
+    }
+    return ocrWorker;
+  }
+  async function decodeImage(file) {
+    try { return await createImageBitmap(file, { imageOrientation: "from-image" }); }
+    catch { return await new Promise((ok, fail) => { const im = new Image(), u = URL.createObjectURL(file); im.onload = () => { URL.revokeObjectURL(u); ok(im); }; im.onerror = () => fail(new Error("사진을 열지 못했습니다. 다른 사진으로 해 보세요.")); im.src = u; }); }
+  }
+  /* 사진을 긴 변 long px로 맞추고, 돌리고, 흑백으로 바꿔 대비를 늘린다. 글자 인식이 더 잘 된다. */
+  function prepImage(src, turn, longSide) {
+    const w0 = src.width, h0 = src.height;
+    const k = longSide / Math.max(w0, h0);
+    const sw = Math.round(w0 * k), sh = Math.round(h0 * k), rot = turn % 4;
+    const cw = rot % 2 ? sh : sw, ch = rot % 2 ? sw : sh;
+    const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
+    const g = cv.getContext("2d", { willReadFrequently: true });
+    g.translate(cw / 2, ch / 2); g.rotate(rot * Math.PI / 2); g.drawImage(src, -sw / 2, -sh / 2, sw, sh);
+    const img = g.getImageData(0, 0, cw, ch), d = img.data, hist = new Uint32Array(256);
+    for (let i = 0; i < d.length; i += 4) { const y = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; d[i] = y; hist[y]++; }
+    const n = cw * ch; let lo = 0, hi = 255, acc = 0;
+    while (lo < 254 && (acc += hist[lo]) < n * 0.02) lo++;
+    acc = 0; while (hi > lo + 1 && (acc += hist[hi]) < n * 0.02) hi--;
+    const span = Math.max(1, hi - lo);
+    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, (d[i] - lo) * 255 / span)); d[i] = d[i + 1] = d[i + 2] = v; }
+    g.putImageData(img, 0, 0);
+    cv.k = k;
+    return cv;
+  }
+  /* 세 번 읽어 합친다. 기본 모드(긴 변 2000px)는 전화·주소처럼 반듯한 줄을 잘 읽지만 크기가 섞인 이름 줄을 놓치고,
+     듬성듬성한 글자 모드(1000px)와 한 덩어리 모드(700px)는 큰 이름과 직함을 잘 잡는다. 줄 높이는 원본 사진 기준으로 맞춘다. */
+  const OCR_PASSES = [[2000, "3"], [1000, "11"], [700, "6"]];
+  async function startScan(file, turn = 0) {
+    if (!file) return;
+    const same = S.scan?.file === file;
+    if (S.scan?.url && !same) URL.revokeObjectURL(S.scan.url);
+    const job = S.scan = { file, turn, url: same ? S.scan.url : URL.createObjectURL(file), status: "reading", step: "사진을 준비하는 중", progress: 0 };
+    if (S.route !== "scan") go("scan"); else render();
+    try {
+      const src = await decodeImage(file);
+      const w = await getOcr();
+      const lines = [];
+      for (let p = 0; p < OCR_PASSES.length; p++) {
+        if (S.scan !== job) return;
+        const [longSide, psm] = OCR_PASSES[p], cv = prepImage(src, turn, longSide);
+        job.pass = p; job.step = OCR_STEP["recognizing text"]; job.progress = p / OCR_PASSES.length; paintProgress();
+        await w.setParameters({ tessedit_pageseg_mode: psm });
+        const { data } = await w.recognize(cv, {}, { text: true, blocks: true });
+        lines.push(...(data.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(pp => pp.lines || []))
+          .filter(l => (l.confidence ?? 100) >= 25).map(l => ({ text: l.text || "", h: l.bbox ? (l.bbox.y1 - l.bbox.y0) / cv.k : 0, pass: p })));
+      }
+      if (S.scan !== job) return;
+      const shown = [...new Set(lines.map(l => cleanLine(l.text)).filter(Boolean))];
+      Object.assign(job, { status: "done", fields: parseCard(lines), raw: shown.join("\n") });
+    } catch (err) {
+      if (S.scan !== job) return;
+      Object.assign(job, { status: "error", error: String(err?.message || err || "알 수 없는 오류") });
+    }
+    if (S.route === "scan") render();
+  }
+  function saveScan() {
+    const f = Object.fromEntries(Object.entries(S.scan.fields).map(([k, v]) => [k, String(v ?? "").trim()]).filter(([, v]) => v));
+    if (!f.name && !f.company && !f.mobile && !f.email) { S.msg = "이름, 회사, 휴대폰, 이메일 중 하나는 있어야 저장할 수 있습니다."; render(); return; }
+    S.msg = "";
+    if (f.email) f.email = f.email.toLowerCase();
+    const old = DB.contacts.find(c => keyOf(c) === keyOf(f));
+    if (!old) f.registeredAt = today();
+    mergeContacts([f]);
+    if (!save()) { render(); return; }
+    const c = DB.contacts.find(x => keyOf(x) === keyOf(f));
+    URL.revokeObjectURL(S.scan.url);
+    S.scan = { status: "saved", savedName: c?.name || c?.company || "명함", savedId: c?.id, updated: !!old };
+    render(); window.scrollTo(0, 0);
+  }
+  const SCAN_FIELDS = [["name", "이름"], ["company", "회사"], ["dept", "부서"], ["title", "직책"], ["mobile", "휴대폰", "tel"], ["phone", "전화", "tel"], ["email", "이메일", "email"], ["website", "웹사이트"], ["address", "주소"]];
+
+  /* PARSE-START: 읽은 줄(text, h=글자 높이)에서 명함 칸을 규칙으로 나눈다. */
+  const SURNAMES = "김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진나엄원채천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부가복태목형피두감음빈동온호범좌팽승간상갈";
+  const KO_TITLES = "대표이사|공동대표|대표|부회장|회장|부사장|사장|전무이사|상무이사|전무|상무|이사|감사|본부장|센터장|연구소장|소장|실장|지점장|지사장|원장|팀장|파트장|그룹장|부장|차장|과장|대리|주임|사원|매니저|책임연구원|선임연구원|수석연구원|연구원|책임|선임|수석|위원|교수|변호사|회계사|세무사|노무사|변리사|파트너|고문|컨설턴트|디렉터|프로|간호사|약사|의사|기자|PD";
+  const TITLE_TOKEN = new RegExp(`^(${KO_TITLES}|CEO|CTO|CFO|COO|CIO|CMO|CSO|VP)$`, "i");
+  const EN_TITLE = /\b((?:Senior|Vice|Executive|General|Managing|Chief|Assistant|Associate)\s+)?(President|Director|Manager|Engineer|Partner|Consultant|Associate|Analyst|Officer|Head|Lead|Principal|Founder|Researcher|Specialist|Representative|Attorney|Accountant|CEO|CTO|CFO|COO|CIO|CMO|VP)\b(\s+of\s+[A-Z][A-Za-z&]+)?/;
+  const DEPT_TOKEN = /^[가-힣A-Za-z0-9&]{1,14}(사업본부|사업부|본부|부문|팀|실|센터|연구소|파트|사업단|그룹|국|과|부)$/;
+  const EN_DEPT = /\b([A-Z][A-Za-z&]*(?:\s+[A-Z&][A-Za-z&]*){0,3}\s+(?:Team|Division|Department|Dept\.?|Center|Office|Group|Lab))\b/;
+  const CORP = /\(주\)|㈜|주식회사|유한회사|\(유\)|\(사\)|\(재\)|회계법인|법무법인|세무법인|특허법인|노무법인|재단|협회|조합|공사|공단|병원|의원|대학교|대학|은행|증권|보험|캐피탈|그룹|홀딩스|\bInc\b\.?|\bCo\b\.?,?\s*Ltd|\bLtd\b|\bCorp\b|Corporation|Company|\bLLC\b|\bLLP\b|Holdings|Group|Bank|Hospital|University|Partners/i;
+  const ADDR = /(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충청|충북|충남|전라|전북|전남|경상|경북|경남|제주)|[가-힣0-9]+(로|길)\s*\d|\d+\s*(층|호)(\b|$|[^가-힣])|\b(Seoul|Korea|Gyeonggi|Busan|Incheon)\b/i;
+  const NOT_NAME = new Set(["주식회사", "유한회사", "본사", "지사", "공장", "연구소", "서울", "경기", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "강원", "제주", "휴대폰", "핸드폰", "전화", "팩스", "주소", "이메일", "메일", "대한민국", "한국", "센터", "빌딩", "타워"]);
+  const LABEL = { fax: /(?:^|[^a-z])(f|fax|팩스|팩)\s*[.:)]?\s*$/i, mobile: /(?:^|[^a-z])(m|mob|mobile|h\.?\s?p|c\.?\s?p|cell|cellular|휴대폰|핸드폰|휴대전화|모바일|핸드폰번호)\s*[.:)]?\s*$/i, tel: /(?:^|[^a-z])(t|tel|phone|office|o|d|dir|direct|전화|대표|직통|대표전화)\s*[.:)]?\s*$/i };
+  const PHONE_RE = /(\+\s?82[\s.\-)]*)?\(?0?\d{1,3}\)?[\s.\-]{0,2}\d{3,4}[\s.\-]{1,2}\d{4}(?!\d)/g;
+
+  function fmtPhone(d) {
+    if (/^02\d{7,8}$/.test(d)) return d.length === 9 ? `02-${d.slice(2, 5)}-${d.slice(5)}` : `02-${d.slice(2, 6)}-${d.slice(6)}`;
+    if (/^1[5-9]\d{6}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4)}`;
+    if (/^0\d{9}$/.test(d)) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+    if (/^0\d{10}$/.test(d)) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+    return null;
+  }
+  /* 한글 OCR은 '김 하 늘'처럼 글자 사이를 띄우는 일이 많아, 한 글자씩 떨어진 한글을 붙인다. */
+  function cleanLine(t) {
+    return String(t).replace(/[|“”‘’`´_~^=<>«»\[\]{}]/g, " ").replace(/\s+/g, " ").trim()
+      .replace(/^(?:\(\s*[주쥬]\s*\)|[@©®]|㈜)\s*(?=[가-힣])/, "㈜")
+      .replace(/(^|\s)((?:[가-힣]\s){1,5}[가-힣])(?=\s|$)/g, (m, p, s) => p + s.replace(/\s/g, ""));
+  }
+  function parseCard(raw) {
+    const lines = raw.map(l => ({ text: cleanLine(l.text), h: l.h || 0 })).filter(l => l.text.replace(/[^가-힣A-Za-z0-9]/g, "").length >= 2);
+    const out = { name: "", company: "", dept: "", title: "", mobile: "", phone: "", email: "", website: "", address: "" };
+    const used = new Set();
+    // 1) 이메일·웹사이트. 여러 번 읽은 줄 가운데 가장 긴(덜 잘린) 이메일을 고른다. 'kim. lee@'처럼 점 뒤 빈칸은 붙인다.
+    lines.forEach((l, i) => {
+      const t = l.text.replace(/\s*@\s*/g, "@").replace(/([A-Za-z0-9])\s*\.\s+(?=[A-Za-z0-9._%+\-]*@)/g, "$1.");
+      const em = t.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}/);
+      if (em) { if (em[0].length > out.email.length) out.email = em[0].toLowerCase(); l.text = t.replace(em[0], " "); }
+      if (!/@/.test(l.text)) {
+        const web = l.text.match(/((?:https?:\/\/)?(?:www\.)?[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.(?:co\.kr|or\.kr|go\.kr|ac\.kr|re\.kr|ne\.kr|com|net|org|kr|io|ai|biz|info|me|app)(?:\/\S*)?)(?![a-z])/i);
+        if (web && !out.website) { out.website = web[1].replace(/^https?:\/\//i, "").toLowerCase(); l.text = l.text.replace(web[1], " "); }
+      }
+    });
+    // 2) 전화번호: 앞에 붙은 표시(M, T, F 등)로 휴대폰·전화·팩스를 나눈다. 010 등으로 시작하면 휴대폰이다.
+    lines.forEach(l => {
+      let last = 0, rest = "";
+      for (const m of l.text.matchAll(PHONE_RE)) {
+        const before = l.text.slice(last, m.index);
+        rest += before; last = m.index + m[0].length;
+        let d = m[0].replace(/\D/g, "");
+        if (/^\+?\s?82/.test(m[0].trim())) d = "0" + d.slice(2).replace(/^0/, "");
+        const f = fmtPhone(d); if (!f) { rest += m[0]; continue; }
+        const kind = /^01[016789]/.test(d) ? "mobile" : LABEL.fax.test(before) ? "fax" : LABEL.mobile.test(before) ? "mobile" : "tel";
+        if (kind === "mobile" && !out.mobile) out.mobile = f;
+        else if (kind === "tel" && !out.phone) out.phone = f;
+        rest = rest.replace(/(?:^|\s)(m|mob|mobile|h\.?\s?p|c\.?\s?p|cell|t|tel|phone|office|o|d|dir|direct|f|fax|전화|휴대폰|핸드폰|휴대전화|팩스|직통|대표전화)\s*[.:)]?\s*$/i, " ");
+      }
+      if (last) l.text = (rest + l.text.slice(last)).replace(/\s+/g, " ").trim();
+    });
+    // 3) 주소: 지역 이름이나 '…로 12', '5층' 같은 꼴. 다음 줄이 '(역삼동, OO빌딩)'처럼 이어지면 붙인다.
+    //    여러 번 읽은 후보 가운데 한글이 많고 '5층'처럼 층·호가 살아 있는 것을 고른다.
+    let addrScore = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].text.replace(/^(주소|address|addr|a)\s*[.:)]\s*/i, "");
+      if (ADDR.test(t) && /\d/.test(t) && t.length >= 8) {
+        let a = t; used.add(i);
+        const nx = lines[i + 1]?.text || "";
+        if (nx && nx.length <= 30 && (/^\(/.test(nx) || /(층|호|빌딩|타워|센터|동)\)?$/.test(nx)) && !CORP.test(nx)) { a += " " + nx; used.add(i + 1); }
+        a = a.replace(/^[,.\s]+|[,.\s]+$/g, "");
+        const sc = (a.match(/[가-힣]/g) || []).length + (/\d\s*(층|호)/.test(a) ? 3 : 0) + a.length / 100;
+        if (sc > addrScore) { addrScore = sc; out.address = a; }
+      }
+    }
+    // 남은 내용이 거의 없는 줄(번호만 있던 줄)은 뺀다.
+    lines.forEach((l, i) => { if (l.text.replace(/[^가-힣A-Za-z]/g, "").length < 2) used.add(i); });
+    // 4) 회사: 주식회사, (주), 법인, Co., Ltd 같은 표시가 있는 줄. 한글 줄을 먼저 고른다.
+    const corpLines = lines.map((l, i) => i).filter(i => !used.has(i) && CORP.test(lines[i].text) && !/\d{3,}/.test(lines[i].text));
+    const corpIdx = corpLines.find(i => /[가-힣]/.test(lines[i].text)) ?? corpLines[0];
+    if (corpIdx !== undefined) { out.company = lines[corpIdx].text.replace(/^[,.\s]+|[,.\s]+$/g, ""); used.add(corpIdx); }
+    corpLines.forEach(i => used.add(i));
+    // 5) 이름: 성으로 시작하는 2~4글자 한글 낱말. 글자가 크고, 같은 줄에 직함이 있으면 점수를 더한다.
+    const maxH = Math.max(1, ...lines.map(l => l.h));
+    let best = null;
+    lines.forEach((l, i) => {
+      if (used.has(i)) return;
+      const toks = l.text.split(/[\s,·•/]+/).filter(Boolean);
+      const hasTitle = toks.some(t => TITLE_TOKEN.test(t)) || EN_TITLE.test(l.text);
+      toks.forEach((t, j) => {
+        if (!/^[가-힣]{2,4}$/.test(t) || TITLE_TOKEN.test(t) || DEPT_TOKEN.test(t) || NOT_NAME.has(t)) return;
+        let s = Math.round(l.h / maxH * 10) / 10 * 3 + (SURNAMES.includes(t[0]) ? 2 : -2) + (hasTitle ? 1.5 : 0) + (t.length === 3 ? 1 : 0) - (toks.length > 4 ? 1 : 0) - (j > 1 ? 0.5 : 0) - (/\d/.test(l.text) ? 1 : 0);
+        if (!best || s > best.s) best = { s, i, t };
+      });
+    });
+    if (best && best.s > 0) { out.name = best.t; }
+    else {
+      lines.forEach((l, i) => {
+        if (used.has(i) || EN_TITLE.test(l.text) || EN_DEPT.test(l.text)) return;
+        if (/^[A-Z][a-z]+(?:[ \-][A-Z][a-z]+){1,2}$/.test(l.text)) { const s = Math.round(l.h / maxH * 10) / 10; if (!best || s > best.s) best = { s, i, t: l.text }; }
+      });
+      if (best) out.name = best.t;
+    }
+    // 6) 직함·부서: 이름 줄 → 이름 줄 앞뒤 → 나머지 줄 순서로 찾는다. '재무팀장'은 부서 '재무팀'과 직함 '팀장'으로 나눈다.
+    const order = best ? [best.i, best.i + 1, best.i - 1, ...lines.map((_, i) => i)] : lines.map((_, i) => i);
+    const seen = new Set();
+    for (const i of order) {
+      if (seen.has(i) || !lines[i] || (used.has(i) && i !== best?.i)) continue;
+      seen.add(i);
+      const toks = lines[i].text.split(/[\s,·•/]+/).filter(Boolean);
+      for (const t of toks) {
+        if (t === out.name) continue;
+        if (!out.title && TITLE_TOKEN.test(t)) { out.title = t; continue; }
+        const both = t.match(/^([가-힣A-Za-z0-9&]{2,12}(?:팀|본부|실|센터|부|소|파트|그룹))(장)$/);
+        if (both && !out.dept && !out.title) { out.dept = both[1]; out.title = both[1].match(/(팀|본부|실|센터|부|소|파트|그룹)$/)[1] + "장"; continue; }
+        if (!out.dept && DEPT_TOKEN.test(t) && t.length >= 3 && !TITLE_TOKEN.test(t) && !CORP.test(t)) out.dept = t;
+      }
+      if (!out.title) { const m = lines[i].text.match(EN_TITLE); if (m) out.title = m[0].trim(); }
+      if (!out.dept) { const m = lines[i].text.match(EN_DEPT); if (m && m[1] !== out.company) out.dept = m[1]; }
+      if (out.title && out.dept) break;
+    }
+    // 7) 회사 표시가 없으면, 이름·직함·부서가 아닌 줄 중 글자가 가장 큰 짧은 줄을 회사로 짐작한다.
+    if (!out.company) {
+      const cand = lines.map((l, i) => ({ l, i })).filter(({ l, i }) => !used.has(i) && i !== best?.i && !/\d/.test(l.text) && l.text.length <= 25
+        && !(out.dept && l.text.includes(out.dept)) && !(out.title && l.text.includes(out.title)) && !(out.name && l.text.includes(out.name)))
+        .sort((a, b) => b.l.h - a.l.h)[0];
+      if (cand) out.company = cand.l.text;
+    }
+    return out;
+  }
+  /* PARSE-END */
 
   /* ---------- 샘플 (모두 가상의 인물·회사) ---------- */
   function loadSample() {
@@ -374,17 +615,18 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
       h("div", { class: "bar" }, h("a", { class: "back", href: "../../" }, "← 공부방"), DB.sample ? h("span", { class: "tag" }, "샘플 데이터") : null),
       h("div", null, h("h1", null, title), sub ? h("p", { class: "muted small" }, sub) : null),
       h("nav", { class: "tabs", style: `--tabs:${tabs.length}`, "aria-label": "Connect 메뉴" }, tabs.map(([r, l]) =>
-        h("button", { "aria-current": (S.route === r || (r === "find" && S.route === "person")) ? "page" : null, onclick: () => go(r) }, l))),
+        h("button", { "aria-current": (S.route === r || (r === "find" && ["person", "scan"].includes(S.route))) ? "page" : null, onclick: () => go(r) }, l))),
       S.msg ? h("div", { class: "note bad", role: "alert" }, S.msg) : null
     ];
   }
 
   function viewEmpty() {
     return h("div", { class: "card" },
-      h("h3", null, "명함을 불러와 시작합니다"),
-      h("p", { class: "small" }, "리멤버 앱의 설정 → 명함 내보내기에서 엑셀 파일을 이메일로 받은 뒤, '가져오기' 탭에서 올리세요. 파일은 이 기기의 브라우저 안에서만 읽고 저장하며 어디로도 보내지 않습니다."),
+      h("h3", null, "명함을 넣어 시작합니다"),
+      h("p", { class: "small" }, "명함을 한 장씩 찍어 넣거나, 리멤버 앱의 설정 → 명함 내보내기에서 받은 엑셀 파일을 '가져오기' 탭에서 올리세요. 사진과 파일은 이 기기의 브라우저 안에서만 읽고 저장하며 어디로도 보내지 않습니다."),
       h("div", { class: "row" },
-        h("button", { class: "btn", onclick: () => go("import") }, "명함 파일 가져오기"),
+        h("button", { class: "btn", onclick: () => go("scan") }, "명함 찍어서 넣기"),
+        h("button", { class: "btn ghost", onclick: () => go("import") }, "명함 파일 가져오기"),
         h("button", { class: "btn ghost", onclick: loadSample }, "샘플로 둘러보기")));
   }
 
@@ -402,6 +644,55 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
         c.nextAt ? [h("dt", null, "다음 연락"), h("dd", null, c.nextAt + (isDue(c) ? " · 연락할 때" : ""))] : null),
       (c.tags || []).length ? h("div", { class: "row" }, c.tags.map(t => h("span", { class: "tag" }, t))) : null,
       h("button", { class: "back small", onclick: () => go("p-" + c.id) }, "기록·메모 보기와 고치기"));
+  }
+
+  /* 사진 고르기: 카메라로 바로 찍거나 앨범에서 고른다. 사진은 이 기기 밖으로 나가지 않는다. */
+  const onPick = e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) startScan(f); };
+  function camPickers(prefix) {
+    return h("div", { class: "row" },
+      h("label", { class: "btn", for: prefix + "-shot" }, "카메라로 찍기"),
+      h("input", { id: prefix + "-shot", type: "file", accept: "image/*", capture: "environment", hidden: true, onchange: onPick }),
+      h("label", { class: "btn ghost", for: prefix + "-pick" }, "사진에서 고르기"),
+      h("input", { id: prefix + "-pick", type: "file", accept: "image/*", hidden: true, onchange: onPick }));
+  }
+  function fab() {
+    return [h("label", { class: "fab", for: "fab-shot", title: "명함 촬영" }, h("span", { "aria-hidden": "true", style: "font-size:1.5rem;line-height:1" }, "+"), "명함 촬영"),
+      h("input", { id: "fab-shot", type: "file", accept: "image/*", capture: "environment", hidden: true, onchange: onPick })];
+  }
+  function viewScan() {
+    const sc = S.scan;
+    const out = [header("명함 촬영", "명함을 찍으면 이 기기 안에서 글자를 읽어 칸을 채웁니다.")];
+    if (!sc || sc.status === "saved") {
+      if (sc) out.push(h("div", { class: "note good", role: "status" }, `${sc.savedName} 명함을 ${sc.updated ? "기존 명함에 고쳐 " : ""}저장했습니다. `,
+        h("button", { class: "back small", onclick: () => go("p-" + sc.savedId) }, "사람 보기")));
+      out.push(h("div", { class: "card" }, h("h3", null, sc ? "다음 명함 찍기" : "명함 찍기"),
+        h("p", { class: "small" }, "밝은 곳에서 명함이 화면을 가득 채우도록 똑바로 찍어 주세요. 그림자와 빛 반사가 없을수록 잘 읽힙니다."),
+        camPickers("scan")),
+        h("p", { class: "muted small" }, "사진은 서버로 보내지 않고 이 브라우저 안에서만 읽습니다. 사진 자체는 저장하지 않고, 확인한 연락처만 저장합니다. 처음 한 번은 글자 인식 도구와 글자 데이터(약 9MB)를 받느라 시간이 걸리니 와이파이에서 해 보세요."));
+      return out;
+    }
+    out.push(h("img", { class: "scanimg", src: sc.url, alt: "찍은 명함 사진" }));
+    if (sc.status === "reading") out.push(h("div", { class: "card", "aria-live": "polite" }, h("p", { id: "scanstep" }, sc.step),
+      h("div", { class: "progress" }, h("span", { id: "scanbar", style: `width:${Math.round((sc.progress || 0) * 100)}%` }))));
+    if (sc.status === "error") out.push(h("div", { class: "note bad", role: "alert" }, "읽지 못했습니다. " + sc.error), h("div", { class: "card" }, camPickers("scan")));
+    if (sc.status === "done") {
+      const f = sc.fields, dup = DB.contacts.find(c => keyOf(c) === keyOf(f));
+      const empty = !Object.values(f).some(Boolean);
+      out.push(h("form", { class: "card", onsubmit: e => { e.preventDefault(); saveScan(); } },
+        h("h3", null, "읽은 내용 확인"),
+        h("p", { class: "small muted" }, empty ? "글자를 거의 읽지 못했습니다. 다시 찍거나 사진을 돌려 읽어 보세요. 직접 적어도 됩니다." : "틀린 칸만 고친 뒤 저장하세요."),
+        h("div", { class: "form2" }, SCAN_FIELDS.map(([k, l, type]) => [h("label", { for: "sf-" + k }, l),
+          h("input", { id: "sf-" + k, type: type || "text", autocomplete: "off", value: f[k] || "", oninput: e => { f[k] = e.target.value; } })])),
+        dup ? h("div", { class: "note" }, `이미 있는 ${dup.name || dup.company}님과 이메일·휴대폰(또는 이름+회사)이 같아, 저장하면 그 명함 정보를 새로 고칩니다. 태그·기록·메모는 그대로입니다.`) : null,
+        h("div", { class: "row" },
+          h("button", { class: "btn", type: "submit" }, dup ? "기존 명함 고쳐 저장" : "저장"),
+          h("button", { class: "btn ghost", type: "button", onclick: () => startScan(sc.file, (sc.turn + 1) % 4) }, "90° 돌려 다시 읽기"),
+          h("button", { class: "btn ghost", type: "button", onclick: () => { URL.revokeObjectURL(sc.url); S.scan = null; render(); } }, "다시 찍기"))),
+        h("details", { class: "card" }, h("summary", null, "읽은 글자 전체 보기"),
+          h("p", { class: "small", style: "white-space:pre-wrap" }, sc.raw || "(읽은 글자가 없습니다)"),
+          h("p", { class: "muted small" }, "칸에 빠진 내용이 있으면 여기서 보고 옮겨 적으세요.")));
+    }
+    return out;
   }
 
   /* 찾기: 입력창 하나. 이름이면 기본정보, 질문이면 벡터 검색. 비어 있으면 사람 목록을 걸러 본다. */
@@ -436,7 +727,8 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
       live && live.kind === "question" ? h("p", { class: "muted small" }, "질문으로 보고 지식과 기록에서 찾습니다. '찾기'를 누르세요.") : null,
       S.chat.length ? h("button", { class: "back small", onclick: () => { S.chat = []; render(); } }, "대화 지우기") : null,
       browse,
-      h("p", { class: "muted small" }, "사람 이름이나 회사 이름을 치면 기본정보만 보여 줍니다. 구체적인 질문은 지식과 명함의 메모·기록을 벡터 검색해 가장 가까운 문장으로 답합니다.")];
+      h("p", { class: "muted small" }, "사람 이름이나 회사 이름을 치면 기본정보만 보여 줍니다. 구체적인 질문은 지식과 명함의 메모·기록을 벡터 검색해 가장 가까운 문장으로 답합니다."),
+      fab()];
   }
 
   function viewPerson() {
@@ -563,6 +855,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     } });
     const out = [header("가져오기", "리멤버에서 내보낸 엑셀(XLS·XLSX)이나 CSV를 올립니다."),
       h("div", { class: "note" }, "파일은 이 기기의 브라우저 안에서만 읽고 저장합니다. 서버나 저장소로 보내지 않습니다. 같은 사람(이메일·휴대폰·이름+회사가 같은 사람)을 다시 가져오면 명함 정보만 새로 고치고, 태그·기록·메모는 그대로 둡니다."),
+      h("div", { class: "card" }, h("h3", null, "종이 명함은 찍어서"), h("p", { class: "small" }, "명함을 찍으면 바로 칸을 채워 줍니다. 한 장씩 넣을 때 편합니다."), h("div", { class: "row" }, h("button", { class: "btn ghost", onclick: () => go("scan") }, "명함 촬영으로"))),
       h("div", { class: "card" }, h("h3", null, "1. 리멤버에서 파일 받기"),
         h("p", { class: "small" }, "리멤버 앱 → 설정 → 명함 내보내기 → 전체 선택 → 엑셀 파일 받기 → 받은 메일의 첨부 파일을 이 기기에 저장합니다. 메뉴 이름은 앱 버전에 따라 조금 다를 수 있습니다.")),
       h("div", { class: "card" }, h("h3", null, "2. 파일 고르기"), pick,
@@ -604,7 +897,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
   }
 
   function render() {
-    const view = S.route === "person" ? viewPerson() : S.route === "kb" ? viewKb() : S.route === "import" ? viewImport() : viewFind();
+    const view = S.route === "person" ? viewPerson() : S.route === "kb" ? viewKb() : S.route === "import" ? viewImport() : S.route === "scan" ? viewScan() : viewFind();
     app.replaceChildren(...[view].flat(Infinity).filter(Boolean));
     if (S.route !== "import") S.flash = "";
   }

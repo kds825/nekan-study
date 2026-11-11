@@ -16,7 +16,7 @@
     {
       "id": "connect",
       "name": "Connect",
-      "description": "명함과 직접 넣은 지식을 이 기기 안에서만 다룹니다. 이름을 치면 기본정보, 질문하면 지식과 기록을 찾아 답합니다.",
+      "description": "명함을 찍거나 파일로 넣으면 이 기기 안에서만 정리합니다. 이름을 치면 기본정보, 질문하면 지식과 기록을 찾아 답합니다.",
       "path": "apps/connect/",
       "icon": "people",
       "status": "live",
