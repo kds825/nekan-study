@@ -579,13 +579,28 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
      - 사람 이름(또는 이름 + 님/직함, 회사 이름만)이면 기본정보 카드만 보여 준다.
      - 그 밖의 구체적인 질문은 벡터 검색으로 지식과 명함 메모·기록에서 찾아 답한다. */
   const TITLES = "님|씨|팀장|부장|과장|대리|차장|실장|상무|전무|이사|대표|파트너|매니저|사원|주임|본부장|사장|프로|책임|선임|수석";
+  /* 이름 앞부분 맞추기. 마지막 글자는 치는 중일 수 있어 'ㄱ'은 '권', '궈'도 '권'과 맞는 것으로 본다. */
+  const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+  function namePrefix(name, t) {
+    if (name.length < t.length) return false;
+    for (let i = 0; i < t.length; i++) {
+      const a = t[i], b = name[i];
+      if (a === b) continue;
+      if (i < t.length - 1) return false;
+      const bc = b.charCodeAt(0) - 0xAC00; if (bc < 0 || bc > 11171) return false;
+      const ci = CHO.indexOf(a); if (ci >= 0) return Math.floor(bc / 588) === ci;
+      const ac = a.charCodeAt(0) - 0xAC00; if (ac < 0 || ac > 11171 || ac % 28) return false;
+      return Math.floor(ac / 28) === Math.floor(bc / 28);
+    }
+    return true;
+  }
   function classify(input) {
     const t = input.trim().replace(/[?？!.]+$/, "");
     if (!t || !DB.contacts.length) return { kind: "question" };
     const rest = new RegExp(`^\\s*(${TITLES})?\\s*(님)?\\s*(정보|연락처|누구)?\\s*$`);
     const byName = DB.contacts.filter(c => c.name && c.name.length >= 2 && t.startsWith(c.name) && rest.test(t.slice(c.name.length)));
     if (byName.length) return { kind: "person", people: byName };
-    if (/^[가-힣]{2,4}$/.test(t)) { const pre = DB.contacts.filter(c => c.name && c.name.startsWith(t)); if (pre.length) return { kind: "person", people: pre }; }
+    if (/^[가-힣]{0,3}[가-힣ㄱ-ㅎ]$/.test(t)) { const pre = DB.contacts.filter(c => c.name && namePrefix(c.name, t)); if (pre.length) return { kind: "person", people: pre }; }
     const byCo = DB.contacts.filter(c => c.company && norm(c.company) === norm(t.replace(/\s*(사람|직원|명함|목록|분들)$/, "")));
     if (byCo.length) return { kind: "company", people: byCo };
     return { kind: "question" };
@@ -630,6 +645,32 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
         h("button", { class: "btn ghost", onclick: loadSample }, "샘플로 둘러보기")));
   }
 
+  /* 휴대폰 연락처로 보내기: 웹 페이지는 연락처에 직접 쓸 수 없어 vCard(.vcf) 파일을 만들어 연다.
+     폰이 그 파일을 열면 '새로운 연락처 생성'이나 '가져오기'로 저장한다. */
+  function toVcf(c) {
+    const esc = v => String(v || "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/([,;])/g, "\\$1");
+    const name = (c.name || "").trim();
+    let fam = "", giv = name;
+    if (/^[가-힣]{2,4}$/.test(name)) { const two = /^(남궁|황보|제갈|선우|독고|사공|서문|동방)/.test(name) && name.length > 2 ? 2 : 1; fam = name.slice(0, two); giv = name.slice(two); }
+    else if (/^\S+\s+\S+$/.test(name)) [giv, fam] = name.split(/\s+/);
+    const L = ["BEGIN:VCARD", "VERSION:3.0", `N:${esc(fam)};${esc(giv)};;;`, `FN:${esc(name || c.company || "명함")}`];
+    if (c.company || c.dept) L.push(`ORG:${esc(c.company)}${c.dept ? ";" + esc(c.dept) : ""}`);
+    if (c.title) L.push(`TITLE:${esc(c.title)}`);
+    if (c.mobile) L.push(`TEL;TYPE=CELL:${c.mobile}`);
+    if (c.phone) L.push(`TEL;TYPE=WORK,VOICE:${c.phone}`);
+    if (c.fax) L.push(`TEL;TYPE=WORK,FAX:${c.fax}`);
+    if (c.email) L.push(`EMAIL;TYPE=INTERNET,WORK:${c.email}`);
+    if (c.website) L.push(`URL:${/^https?:/i.test(c.website) ? c.website : "http://" + c.website}`);
+    if (c.address) L.push(`ADR;TYPE=WORK:;;${esc(c.address)};;;;`);
+    L.push("END:VCARD");
+    return L.join("\r\n");
+  }
+  function downloadVcf(list, fileName) {
+    const url = URL.createObjectURL(new Blob([list.map(toVcf).join("\r\n") + "\r\n"], { type: "text/vcard;charset=utf-8" }));
+    const a = h("a", { href: url, download: fileName.replace(/[\/:*?"<>|]/g, "") + ".vcf" }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  const phoneBtn = (c, cls = "btn ghost") => (c.mobile || c.phone || c.email) ? h("button", { class: cls, type: "button", onclick: () => downloadVcf([c], c.name || c.company || "연락처") }, "휴대폰 연락처에 저장") : null;
+
   function basicCard(c) {
     const l = lastContact(c), dial = v => v.replace(/[^\d+]/g, "");
     return h("article", { class: "entry" },
@@ -664,7 +705,8 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
     const out = [header("명함 촬영", "명함을 찍으면 이 기기 안에서 글자를 읽어 칸을 채웁니다.")];
     if (!sc || sc.status === "saved") {
       if (sc) out.push(h("div", { class: "note good", role: "status" }, `${sc.savedName} 명함을 ${sc.updated ? "기존 명함에 고쳐 " : ""}저장했습니다. `,
-        h("button", { class: "back small", onclick: () => go("p-" + sc.savedId) }, "사람 보기")));
+        h("button", { class: "back small", onclick: () => go("p-" + sc.savedId) }, "사람 보기"), " ",
+        byId(sc.savedId) ? phoneBtn(byId(sc.savedId), "back small") : null));
       out.push(h("div", { class: "card" }, h("h3", null, sc ? "다음 명함 찍기" : "명함 찍기"),
         h("p", { class: "small" }, "밝은 곳에서 명함이 화면을 가득 채우도록 똑바로 찍어 주세요. 그림자와 빛 반사가 없을수록 잘 읽힙니다."),
         camPickers("scan")),
@@ -699,6 +741,22 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
   function viewFind() {
     const send = q => { if (!q.trim()) return; S.chat.push({ me: q }, { bot: respond(q) }); S.q = ""; render(); setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0); };
     const nothing = !DB.contacts.length && !DB.kb.items.length;
+    const all = DB.contacts, due = all.filter(isDue).length;
+    return [header("Connect", `${all.length}명 · 지식 ${DB.kb.items.length}개` + (due ? ` · 연락할 사람 ${due}명` : "")),
+      nothing ? viewEmpty() : null,
+      h("div", { class: "stack" }, S.chat.map(m => m.me ? h("div", { class: "msg me" }, m.me) : botMsg(m.bot))),
+      h("form", { class: "row", onsubmit: e => { e.preventDefault(); send(S.q); } },
+        /* 한글 조합이 끊기지 않도록 입력창은 다시 만들지 않고 아래 결과만 바꾼다. */
+        h("input", { style: "flex:1", id: "q", autocomplete: "off", placeholder: "이름 또는 질문 (예: 김하늘 / ERP 예산 언제 확정해?)", "aria-label": "이름 또는 질문", value: S.q,
+          oninput: e => { S.q = e.target.value; refill("find-live", findLive); } }),
+        h("button", { class: "btn", type: "submit" }, "찾기")),
+      h("div", { id: "find-live", class: "stack" }, findLive()),
+      S.chat.length ? h("button", { class: "back small", onclick: () => { S.chat = []; render(); } }, "대화 지우기") : null,
+      h("p", { class: "muted small" }, "사람 이름이나 회사 이름을 치면 기본정보만 보여 줍니다. 구체적인 질문은 지식과 명함의 메모·기록을 벡터 검색해 가장 가까운 문장으로 답합니다."),
+      fab()];
+  }
+  function refill(id, build) { const el = document.getElementById(id); if (el) el.replaceChildren(...[build()].flat(Infinity).filter(Boolean)); }
+  function findLive() {
     const live = S.q.trim() ? classify(S.q) : null;
     const all = DB.contacts, due = all.filter(isDue).length;
     let browse = null;
@@ -714,21 +772,11 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
           h("button", { class: "chip", "aria-pressed": String(S.filter === k), onclick: () => { S.filter = k; render(); } }, l))),
         S.filter !== "none" ? h("div", { class: "stack" }, list.slice(0, 50).map(personRow), list.length > 50 ? h("p", { class: "muted small" }, `앞의 50명만 보여 드립니다. 이름이나 회사를 입력해 찾으세요.`) : null, !list.length ? h("p", { class: "muted small" }, "해당하는 사람이 없습니다.") : null) : null];
     }
-    return [header("Connect", `${all.length}명 · 지식 ${DB.kb.items.length}개` + (due ? ` · 연락할 사람 ${due}명` : "")),
-      nothing ? viewEmpty() : null,
-      h("div", { class: "stack" }, S.chat.map(m => m.me ? h("div", { class: "msg me" }, m.me) : botMsg(m.bot))),
-      h("form", { class: "row", onsubmit: e => { e.preventDefault(); send(S.q); } },
-        h("input", { style: "flex:1", id: "q", autocomplete: "off", placeholder: "이름 또는 질문 (예: 김하늘 / ERP 예산 언제 확정해?)", "aria-label": "이름 또는 질문", value: S.q,
-          oninput: e => { const before = classify(S.q).kind; S.q = e.target.value; const after = S.q.trim() ? classify(S.q).kind : "empty"; if (before !== after || after !== "question") { render(); const el = document.getElementById("q"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); } } }),
-        h("button", { class: "btn", type: "submit" }, "찾기")),
-      live && live.kind !== "question" ? h("div", { class: "stack" },
+    return [live && live.kind !== "question" ? h("div", { class: "stack" },
         h("p", { class: "how" }, live.kind === "company" ? `${live.people[0].company} 사람 ${live.people.length}명 (기본정보)` : `이름이 맞는 사람 ${live.people.length}명 (기본정보)`),
         live.people.slice(0, 20).map(basicCard)) : null,
       live && live.kind === "question" ? h("p", { class: "muted small" }, "질문으로 보고 지식과 기록에서 찾습니다. '찾기'를 누르세요.") : null,
-      S.chat.length ? h("button", { class: "back small", onclick: () => { S.chat = []; render(); } }, "대화 지우기") : null,
-      browse,
-      h("p", { class: "muted small" }, "사람 이름이나 회사 이름을 치면 기본정보만 보여 줍니다. 구체적인 질문은 지식과 명함의 메모·기록을 벡터 검색해 가장 가까운 문장으로 답합니다."),
-      fab()];
+      browse];
   }
 
   function viewPerson() {
@@ -743,7 +791,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
       h("div", { class: "card" },
         h("div", { class: "row" }, c.mobile ? h("a", { class: "btn", href: "tel:" + c.mobile.replace(/[^\d+]/g, "") }, "전화") : null,
           c.mobile ? h("a", { class: "btn ghost", href: "sms:" + c.mobile.replace(/[^\d+]/g, "") }, "문자") : null,
-          c.email ? h("a", { class: "btn ghost", href: "mailto:" + c.email }, "메일") : null),
+          c.email ? h("a", { class: "btn ghost", href: "mailto:" + c.email }, "메일") : null, phoneBtn(c)),
         h("dl", null, field("휴대폰", tel(c.mobile)), field("전화", tel(c.phone)), field("이메일", c.email), field("주소", c.address),
           field("웹", c.website), field("그룹", c.group), field("명함 등록", c.registeredAt), field("명함 메모", c.cardMemo),
           field("마지막 연락", l ? `${l} (${daysBetween(l, today())}일 전)` : "기록 없음"))),
@@ -801,8 +849,18 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
   /* ---------- 지식 탭: 사용자가 넣은 글. '찾기'의 질문 답변에 쓰인다. ---------- */
   function viewKb() {
     const list = DB.kb.items;
-    const qn = S.kbQ.trim().toLowerCase();
-    const shown = list.filter(e => !qn || `${e.title} ${e.text} ${(e.tags || []).join(" ")}`.toLowerCase().includes(qn));
+    const kbList = () => {
+      const qn = S.kbQ.trim().toLowerCase();
+      const shown = list.filter(e => !qn || `${e.title} ${e.text} ${(e.tags || []).join(" ")}`.toLowerCase().includes(qn));
+      return shown.length ? shown.map(e => h("article", { class: "entry" },
+        h("strong", null, e.title),
+        h("p", { class: "body" }, e.text),
+        (e.tags || []).length ? h("div", { class: "row" }, e.tags.map(t => h("span", { class: "tag" }, t))) : null,
+        h("div", { class: "row" },
+          h("button", { class: "back small", onclick: () => { S.kbEdit = e.id; S.kbDraft = { title: e.title, text: e.text, tags: (e.tags || []).join(", ") }; render(); scrollTo(0, 0); } }, "고치기"),
+          h("button", { class: "back small", onclick: () => { if (confirm(`'${e.title}'을(를) 지울까요?`)) { DB.kb.items = DB.kb.items.filter(x => x !== e); save(); render(); } } }, "지우기")))) :
+        h("p", { class: "muted small" }, list.length ? "찾는 내용이 없습니다." : "아직 넣은 지식이 없습니다.");
+    };
     const d = S.kbDraft;
     const editing = S.kbEdit && list.find(e => e.id === S.kbEdit);
     const submit = ev => {
@@ -829,15 +887,8 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
             d.title ||= f.name.replace(/\.[^.]+$/, ""); d.text = t.slice(0, 20000); render();
           } }),
           editing ? h("button", { class: "btn ghost", type: "button", onclick: () => { S.kbEdit = null; S.kbDraft = { title: "", text: "", tags: "" }; render(); } }, "취소") : null)),
-      list.length ? h("input", { type: "search", "aria-label": "지식 찾기", placeholder: "넣은 지식에서 찾기", value: S.kbQ, oninput: e => { S.kbQ = e.target.value; render(); document.querySelector('input[aria-label="지식 찾기"]')?.focus(); } }) : null,
-      h("div", { class: "stack" }, shown.length ? shown.map(e => h("article", { class: "entry" },
-        h("strong", null, e.title),
-        h("p", { class: "body" }, e.text),
-        (e.tags || []).length ? h("div", { class: "row" }, e.tags.map(t => h("span", { class: "tag" }, t))) : null,
-        h("div", { class: "row" },
-          h("button", { class: "back small", onclick: () => { S.kbEdit = e.id; S.kbDraft = { title: e.title, text: e.text, tags: (e.tags || []).join(", ") }; render(); scrollTo(0, 0); } }, "고치기"),
-          h("button", { class: "back small", onclick: () => { if (confirm(`'${e.title}'을(를) 지울까요?`)) { DB.kb.items = DB.kb.items.filter(x => x !== e); save(); render(); } } }, "지우기")))) :
-        h("p", { class: "muted small" }, list.length ? "찾는 내용이 없습니다." : "아직 넣은 지식이 없습니다.")),
+      list.length ? h("input", { type: "search", "aria-label": "지식 찾기", placeholder: "넣은 지식에서 찾기", value: S.kbQ, oninput: e => { S.kbQ = e.target.value; refill("kb-list", kbList); } }) : null,
+      h("div", { id: "kb-list", class: "stack" }, kbList()),
       h("p", { class: "muted small" }, "검색 방식: 글을 한글 두 글자 조각과 낱말로 쪼갠 TF-IDF 벡터로 만들고, 질문과 가장 가까운 문단을 코사인 유사도로 찾습니다. 외부 AI를 쓰지 않아 데이터가 기기 밖으로 나가지 않는 대신, 뜻이 같아도 쓰인 낱말이 전혀 다르면 찾지 못합니다.")];
   }
 
@@ -886,6 +937,7 @@ mark { background: var(--mark); color: var(--mark-fg); padding: 0 2px; border-ra
           const url = URL.createObjectURL(new Blob([JSON.stringify({ app: "connect", ...DB, exportedAt: new Date().toISOString() }, null, 1)], { type: "application/json" }));
           const a = h("a", { href: url, download: `connect-백업-${today()}.json` }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
         } }, "백업 파일 저장"),
+        h("button", { class: "btn ghost", disabled: !DB.contacts.length, onclick: () => downloadVcf(DB.contacts.filter(c => c.mobile || c.phone || c.email), `connect-연락처-${today()}`) }, "전체를 휴대폰 연락처 파일로"),
         h("label", { class: "btn ghost", for: "restore" }, "백업 불러오기"),
         h("input", { id: "restore", type: "file", accept: ".json,application/json", hidden: true, onchange: async e => {
           try { const d = JSON.parse(await e.target.files[0].text()); if (d.app !== "connect" || !Array.isArray(d.contacts)) throw 0; DB = { version: 1, contacts: d.contacts, importedAt: d.importedAt, sample: !!d.sample, kb: normKb(d.kb) }; save(); S.flash = `백업에서 ${d.contacts.length}명, 지식 ${DB.kb.items.length}개를 불러왔습니다.`; render(); }
