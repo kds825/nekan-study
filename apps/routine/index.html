@@ -121,6 +121,10 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .rlist .icon-btn:hover:not([disabled]) { background: var(--bg); border-color: var(--line); }
 .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .slottag { font: 500 .72rem/1.6 var(--mono); padding: 0 7px; border-radius: 4px; border: 1px solid var(--accent); color: var(--accent); }
+/* 요일 하나하나: 7칸을 고르게 나누고, 고른 요일은 옅은 색으로 둬서 '매일·평일·주말'보다 가볍게 */
+.days7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.days7 .chip { min-width: 0; padding: 4px 0; border-radius: 6px; }
+.days7 .chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); border-color: var(--accent); font-weight: 700; }
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
 details > summary { cursor: pointer; font-weight: 500; min-height: 32px; display: flex; align-items: center; justify-content: space-between; list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
@@ -348,7 +352,7 @@ details[open] > summary::after { content: "접기 ▴"; }
     return [h("div", { class: "chips", role: "group", "aria-label": "자주 쓰는 요일" },
         [["매일", ALL], ["평일", [1, 2, 3, 4, 5]], ["주말", [0, 6]]].map(([l, ds]) =>
           h("button", { type: "button", class: "chip", "aria-pressed": String(target.days.join() === ds.join()), onclick: () => set(ds.slice()) }, l))),
-      h("div", { class: "chips", role: "group", "aria-label": "요일" }, [1, 2, 3, 4, 5, 6, 0].map(d =>
+      h("div", { class: "chips days7", role: "group", "aria-label": "요일" }, [1, 2, 3, 4, 5, 6, 0].map(d =>
         h("button", { type: "button", class: "chip", "aria-pressed": String(has(d)), onclick: () => { const ds = has(d) ? target.days.filter(x => x !== d) : [...target.days, d]; if (ds.length) set(ds.sort()); } }, DOW[d])))];
   }
   function slotPicker(target) {
