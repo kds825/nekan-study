@@ -299,8 +299,8 @@ details[open] > summary::after { content: "접기 ▴"; }
         h("span", { class: "pct" }, n === due.length ? "다 했어요 ✓" : Math.round(n / due.length * 100) + "%")),
       h("div", { class: "progress", role: "progressbar", "aria-label": "오늘 한 루틴", "aria-valuemin": "0", "aria-valuemax": String(due.length), "aria-valuenow": String(n) }, h("span", { style: `width:${n / due.length * 100}%` }))));
     if (!DB.items.length) {
-      out.push(h("div", { class: "card" }, h("h3", null, "루틴을 먼저 만들어 주세요"),
-        h("p", { class: "small" }, "매일 하고 싶은 일을 넣으면 이 화면에서 하나씩 체크합니다. 아래에서 여러 개 고르거나 '루틴' 탭에서 직접 적으세요."),
+      out.push(h("div", { class: "card" }, h("h3", null, "무엇부터 해 볼까요?"),
+        h("p", { class: "small" }, "아래에서 여러 개 골라 한 번에 시작하세요. 나중에 '루틴' 탭에서 고칠 수 있어요."),
         suggestPicker(),
         h("div", { class: "row" },
           h("button", { class: "btn", disabled: !S.pick.size, onclick: () => { SUGGEST.filter(([n]) => S.pick.has(n)).forEach(s => addItem(...s)); S.pick.clear(); render(); } }, S.pick.size ? `고른 ${S.pick.size}개로 시작` : "골라 주세요"),
