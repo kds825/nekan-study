@@ -152,6 +152,10 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .small-btn { min-height: 36px; padding: 4px 12px; font-size: .85rem; }
 .pill { font-size: .8rem; color: var(--muted); padding: 2px 10px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
 .pill b { font: 700 .9rem var(--mono); color: var(--accent); }
+/* 하루 한 줄 메모: 한 줄 크기, 글이 길어지면 늘어난다 */
+.memo-card { gap: 6px; }
+.memo-card textarea { min-height: 44px; resize: none; field-sizing: content; max-height: 160px; }
+.memo-card .hint { font-size: .75rem; color: var(--muted); }
 .pack { border-top: 1px solid var(--line); padding-top: 10px; }   /* 추천 묶음 사이 구분선 */
 .pack > .bar { min-height: 40px; }   /* 모두 넣기 버튼이 없는 줄도 높이를 맞춘다 */
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
@@ -315,8 +319,8 @@ details[open] > summary::after { content: "접기 ▴"; }
     }
     if (rest.length) out.push(h("div", { class: "rest" }, h("span", { class: "small muted" }, `${DOW[dowOf(day)]}요일은 쉬는 루틴`),
       rest.map(it => h("span", { class: "resttag" }, it.name))));
-    out.push(h("div", { class: "card" }, h("label", { class: "small muted", for: "memo" }, "하루 한 줄 메모 (선택)"),
-      h("textarea", { id: "memo", placeholder: "오늘 어땠나요?", value: DB.memo[day] || "",
+    out.push(h("div", { class: "card memo-card" }, h("div", { class: "bar" }, h("label", { class: "small muted", for: "memo" }, "하루 한 줄 메모"), h("span", { class: "hint" }, "다른 곳을 누르면 저장돼요")),
+      h("textarea", { id: "memo", rows: "1", placeholder: "오늘 어땠나요? (선택)", value: DB.memo[day] || "",
         onchange: e => { const v = e.target.value.trim(); if (v) DB.memo[day] = v; else delete DB.memo[day]; save(); } })));
     return out;
   }
