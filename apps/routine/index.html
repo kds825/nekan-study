@@ -392,7 +392,7 @@ details[open] > summary::after { content: "접기 ▴"; }
   function viewManage() {
     const d = S.draft;
     const live = DB.items.filter(it => !it.end);
-    const out = [header("루틴", `지금 ${live.length}개. 지운 루틴의 지난 기록은 달력에 남습니다.`)];
+    const out = [header("루틴", "루틴을 넣고 고칩니다. 지워도 지난 기록은 남아요.")];
     out.push(h("form", { class: "card", onsubmit: e => {
       e.preventDefault(); if (!d.name.trim()) return;
       addItem(d.name, d.slot, d.days, d.note || ""); S.draft = { name: "", note: "", slot: d.slot, days: d.days }; render();
