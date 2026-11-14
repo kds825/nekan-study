@@ -161,6 +161,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .memo-card textarea { min-height: 44px; resize: none; field-sizing: content; max-height: 160px; }
 .memo-card .hint { font-size: .75rem; color: var(--muted); }
 .pack { border-top: 1px solid var(--line); padding-top: 10px; }   /* 추천 묶음 사이 구분선 */
+.pack .chip[aria-pressed="true"]::before { content: "✓ "; font-weight: 700; }   /* 색만이 아니라 표시로도 고른 것을 알린다 */
 .pack > .bar { min-height: 40px; }   /* 모두 넣기 버튼이 없는 줄도 높이를 맞춘다 */
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
 details > summary { cursor: pointer; font-weight: 500; min-height: 32px; display: flex; align-items: center; justify-content: space-between; list-style: none; }
