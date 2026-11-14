@@ -97,9 +97,11 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .legend { display: flex; gap: 4px; align-items: center; font-size: .78rem; color: var(--muted); }
 .legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
 .strip { display: grid; grid-template-columns: repeat(28, 1fr); gap: 2px; }
-.strip i { height: 14px; border-radius: 2px; background: var(--grid); }
+.strip i { height: 14px; border-radius: 2px; background: var(--line); }
 .strip i.on { background: var(--accent); }
-.strip i.off { background: transparent; }
+.strip { align-items: center; height: 14px; }
+.strip i.off { height: 3px; opacity: .55; }   /* 할 날이 아닌 날: 얇은 줄로 자리만 둔다 */
+.strip i:nth-child(7n+1):not(:first-child) { margin-left: 4px; }          /* 주 단위로 살짝 띄운다 */
 .item { display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; }
 .item .who { flex: 1; min-width: 0; }
 .icon-btn { min-width: 40px; min-height: 40px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--accent); font: 700 1rem var(--body); cursor: pointer; }
