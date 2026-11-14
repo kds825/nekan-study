@@ -106,6 +106,11 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .item .who { flex: 1; min-width: 0; }
 .icon-btn { min-width: 40px; min-height: 40px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--accent); font: 700 1rem var(--body); cursor: pointer; }
 .icon-btn[disabled] { opacity: .35; cursor: default; }
+/* 최근 메모: 날짜 한 줄 + 글, 줄 전체를 누르면 그날로 */
+.memos { display: flex; flex-direction: column; margin: 0 -16px -14px; }
+.memo { display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%; padding: 10px 16px; background: none; border: 0; border-top: 1px solid var(--line); color: var(--fg); font: 400 .95rem/1.55 var(--body); cursor: pointer; }
+.memo time { font: 500 .78rem var(--mono); color: var(--accent); }
+.memo:hover, .memo:focus-visible { background: var(--bg); outline: none; }
 /* 루틴 목록: 카드 하나 안에 구분선으로 나눈 줄 */
 .listhead { font-size: 1.2rem; margin-bottom: -6px; }
 .rlist { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
@@ -312,7 +317,8 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
       })));
     const memos = Object.entries(DB.memo).filter(([d]) => d >= addDays(t, -27)).sort((a, b) => b[0].localeCompare(a[0]));
     if (memos.length) out.push(h("div", { class: "card" }, h("h3", null, "최근 메모"),
-      memos.map(([d, m]) => h("p", { class: "small" }, h("button", { class: "back small", onclick: () => go(d === t ? "today" : "d-" + d) }, fmtDay(d)), " ", m))));
+      h("div", { class: "memos" }, memos.map(([d, m]) => h("button", { class: "memo", "aria-label": `${fmtDay(d)} 메모 보기`, onclick: () => go(d === t ? "today" : "d-" + d) },
+        h("time", null, fmtDay(d)), h("span", null, m))))));
     return out;
   }
 
