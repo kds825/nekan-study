@@ -21,6 +21,16 @@
       "icon": "people",
       "status": "live",
       "addedAt": "2026-11-11"
+    },
+    {
+      "id": "meeting-english",
+      "name": "회의 영어",
+      "description": "회의 영어를 읽고, 듣고, 말하는 하루 10분 학습. 출퇴근 운전 중 듣기와 단어 복습도 있습니다.",
+      "url": "https://kds825.github.io/meeting-english/",
+      "repo": "kds825/meeting-english",
+      "icon": "talk",
+      "status": "live",
+      "addedAt": "2026-11-15"
     }
   ]
 }
