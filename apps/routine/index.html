@@ -51,8 +51,10 @@ a { color: var(--accent); }
 .head { display: flex; flex-direction: column; gap: 2px; }
 .head .back { min-height: 32px; align-self: flex-start; font-size: .92rem; }
 .head h1 { font-size: 1.85rem; }
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; position: sticky; top: 0; z-index: 3; background: var(--bg); padding-block: 6px; }
-.tabs button { min-height: 44px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--accent); font: 400 1.05rem var(--display); cursor: pointer; }
+/* 탭: 한 묶음 안에서 고른 칸만 칠한다. 위로 붙어 따라온다. */
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; position: sticky; top: 6px; z-index: 3; padding: 4px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; box-shadow: 0 0 0 6px var(--bg); }
+.tabs button { min-height: 40px; border-radius: 7px; border: 0; background: transparent; color: var(--muted); font: 400 1.05rem var(--display); cursor: pointer; }
+.tabs button:hover { color: var(--accent); }
 .tabs button[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
 .card { padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
 input, textarea { width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; min-height: 44px; }
