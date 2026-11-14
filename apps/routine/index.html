@@ -144,6 +144,8 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 /* 그날 요일이 아니라 쉬는 루틴: 이름만 점선 표시로 */
 .rest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .resttag { font-size: .8rem; padding: 2px 9px; border-radius: 12px; border: 1px dashed var(--line); color: var(--muted); }
+.danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.small-btn { min-height: 36px; padding: 4px 12px; font-size: .85rem; }
 .pack { border-top: 1px solid var(--line); padding-top: 10px; }   /* 추천 묶음 사이 구분선 */
 .pack > .bar { min-height: 40px; }   /* 모두 넣기 버튼이 없는 줄도 높이를 맞춘다 */
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
@@ -460,8 +462,10 @@ details[open] > summary::after { content: "접기 ▴"; }
             if (DB.items.length && !confirm("지금 기록을 백업 파일 내용으로 바꿀까요?")) return;
             DB = { version: 1, items: d.items, done: d.done || {}, memo: d.memo || {} }; S.msg = ""; save(); render();
           } catch { S.msg = "하루 루틴 백업 파일이 아닙니다."; render(); }
-        } }),
-        h("button", { class: "btn danger", disabled: !DB.items.length, onclick: () => {
+        } })),
+      /* 되돌릴 수 없는 일은 백업 버튼과 떨어뜨려 작게 둔다 */
+      h("div", { class: "danger-zone" }, h("span", { class: "small muted" }, "처음부터 다시 하려면"),
+        h("button", { class: "btn danger small-btn", disabled: !DB.items.length, onclick: () => {
           if (!confirm("루틴과 체크 기록을 모두 지울까요? 되돌릴 수 없습니다.")) return;
           DB = { version: 1, items: [], done: {}, memo: {} }; try { localStorage.removeItem(KEY); } catch { /* 없으면 그만 */ } publishSummary(); render();
         } }, "모두 지우기"))));
