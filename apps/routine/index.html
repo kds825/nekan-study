@@ -129,6 +129,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .days7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .days7 .chip { min-width: 0; padding: 4px 0; border-radius: 6px; }
 .days7 .chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); border-color: var(--accent); font-weight: 700; }
+.pack { border-top: 1px solid var(--line); padding-top: 10px; }   /* 추천 묶음 사이 구분선 */
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
 details > summary { cursor: pointer; font-weight: 500; min-height: 32px; display: flex; align-items: center; justify-content: space-between; list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
@@ -255,13 +256,14 @@ details[open] > summary::after { content: "접기 ▴"; }
       if (s.size) DB.done[day] = [...s]; else delete DB.done[day];
       save(); render();
     };
-    const out = [header(day === t ? "오늘" : "지난 날", day === t ? "할 일을 누르면 체크됩니다. 다시 누르면 풀립니다." : "지난 날의 체크를 고칠 수 있습니다.")];
+    const out = [header(day === t ? "오늘" : "지난 날", !DB.items.length ? "매일 할 일을 정해 두고 하나씩 체크해 보세요." : day === t ? "할 일을 누르면 체크됩니다. 다시 누르면 풀립니다." : "지난 날의 체크를 고칠 수 있습니다.")];
     const nav = h("div", { class: "daynav" },
       h("button", { "aria-label": "전날", onclick: () => go("d-" + addDays(day, -1)) }, "‹"),
       h("strong", null, fmtDay(day)),
       h("button", { "aria-label": "다음 날", disabled: day >= t, onclick: () => go(addDays(day, 1) === t ? "today" : "d-" + addDays(day, 1)) }, "›"));
     /* 날짜 이동과 진행률을 카드 하나에 둔다. 할 일이 없는 날은 날짜 줄만 둔다. */
-    if (!DB.items.length || !due.length) out.push(nav);
+    if (!DB.items.length) { /* 루틴이 하나도 없으면 날짜 이동·진행률을 감춘다 */ }
+    else if (!due.length) out.push(nav);
     else out.push(h("div", { class: "card hero" }, nav,
       h("div", { class: "score" }, h("span", { class: "big" }, String(n)), h("span", { class: "of" }, `/ ${due.length}`),
         h("span", { class: "pct" }, Math.round(n / due.length * 100) + "%")),
@@ -339,7 +341,7 @@ details[open] > summary::after { content: "접기 ▴"; }
   function suggestPicker() {
     return PACKS.map(p => {
       const all = p.items.every(([n]) => S.pick.has(n));
-      return h("div", { class: "stack", style: "gap:6px" },
+      return h("div", { class: "stack pack", style: "gap:6px" },
         h("div", { class: "bar" }, h("strong", { class: "small" }, p.name),
           h("button", { class: "back small", onclick: () => { p.items.forEach(([n]) => all ? S.pick.delete(n) : S.pick.add(n)); render(); } }, all ? "모두 빼기" : "모두 고르기")),
         h("div", { class: "chips", role: "group", "aria-label": p.name }, p.items.map(([name, , days]) =>
@@ -385,7 +387,7 @@ details[open] > summary::after { content: "접기 ▴"; }
       PACKS.map(p => {
         const left = p.items.filter(([n]) => !has(n));
         if (!left.length) return null;
-        return h("div", { class: "stack", style: "gap:6px" },
+        return h("div", { class: "stack pack", style: "gap:6px" },
           h("div", { class: "bar" }, h("strong", { class: "small" }, p.name),
             h("button", { class: "back small", onclick: () => { left.forEach(s => addItem(...s)); render(); } }, `${left.length}개 모두 넣기`)),
           h("div", { class: "chips" }, left.map(s => h("button", { class: "chip", onclick: () => { addItem(...s); render(); } },
