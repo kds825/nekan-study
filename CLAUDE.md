@@ -11,7 +11,7 @@
   - 형식 검사: `node scripts/check-topics.mjs`
 
 **다른 저장소의 앱(링크 앱)**: `apps.json` 항목에 `path` 대신 `url`(https)을 쓰면 첫 화면 카드가 그 주소로 연결된다. 코드는 이 저장소에 넣지 않고, 요약 줄과 저장 키 검사도 하지 않는다.
-- 회의 영어(`meeting-english`): https://kds825.github.io/meeting-english/, 저장소 `kds825/meeting-english`. Vite+React PWA이고 빌드가 필요하며, 음성 파일이 약 520MB라 이 저장소로 옮기지 않는다(사용자 확인, 2026-11-15). 그 앱 수정은 그 저장소에서 한다.
+- 회의 영어(`meeting-english`): https://kds825.github.io/meeting-english/, 저장소 `kds825/meeting-english`. Vite+React PWA이고 빌드가 필요하며, 음성 파일이 약 520MB라 이 저장소로 옮기지 않고 링크로 건다(2026-11-15). 그 앱 수정은 그 저장소에서 한다.
 
 예전 주소(`/nekan-study/#learn-…` 등)로 들어오면 첫 화면이 네칸 앱으로 넘겨 준다.
 
