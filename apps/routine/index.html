@@ -153,6 +153,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .resttag { font-size: .8rem; padding: 2px 9px; border-radius: 12px; border: 1px dashed var(--line); color: var(--muted); }
 .danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
 .small-btn { min-height: 36px; padding: 4px 12px; font-size: .85rem; }
+.inline-link { background: none; border: 0; padding: 0 2px; font: inherit; font-weight: 700; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .pill { font-size: .8rem; color: var(--muted); padding: 2px 10px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
 .pill b { font: 700 .9rem var(--mono); color: var(--accent); }
 /* 하루 한 줄 메모: 한 줄 크기, 글이 길어지면 늘어난다 */
@@ -287,7 +288,7 @@ details[open] > summary::after { content: "접기 ▴"; }
       if (s.size) DB.done[day] = [...s]; else delete DB.done[day];
       save(); render();
     };
-    const out = [header(day === t ? "오늘" : "지난 날", !DB.items.length ? "매일 할 일을 정해 두고 하나씩 체크해 보세요." : day === t ? "할 일을 누르면 체크됩니다. 다시 누르면 풀립니다." : "지난 날의 체크를 고칠 수 있습니다.")];
+    const out = [header(day === t ? "오늘" : "지난 날", !DB.items.length ? "매일 할 일을 정해 두고 하나씩 체크해 보세요." : day === t ? "할 일을 누르면 체크됩니다. 다시 누르면 풀립니다." : ["지난 날의 체크를 고칠 수 있어요. ", h("button", { class: "inline-link", onclick: () => go("today") }, "오늘로 →")])];
     const nav = h("div", { class: "daynav" },
       h("button", { "aria-label": "전날", onclick: () => go("d-" + addDays(day, -1)) }, "‹"),
       h("strong", null, fmtDay(day)),
@@ -323,7 +324,7 @@ details[open] > summary::after { content: "접기 ▴"; }
     if (rest.length) out.push(h("div", { class: "rest" }, h("span", { class: "small muted" }, `${DOW[dowOf(day)]}요일은 쉬는 루틴`),
       rest.map(it => h("span", { class: "resttag" }, it.name))));
     out.push(h("div", { class: "card memo-card" }, h("div", { class: "bar" }, h("label", { class: "small muted", for: "memo" }, "하루 한 줄 메모"), h("span", { class: "hint" }, "다른 곳을 누르면 저장돼요")),
-      h("textarea", { id: "memo", rows: "1", placeholder: "오늘 어땠나요? (선택)", value: DB.memo[day] || "",
+      h("textarea", { id: "memo", rows: "1", placeholder: (day === t ? "오늘" : "이날") + " 어땠나요? (선택)", value: DB.memo[day] || "",
         onchange: e => { const v = e.target.value.trim(); if (v) DB.memo[day] = v; else delete DB.memo[day]; save(); } })));
     return out;
   }
