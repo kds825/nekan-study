@@ -19,7 +19,7 @@
   --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
   --accent: #0d6b66; --accent-ink: #ffffff; --mark: #ffe45c; --mark-fg: #16282b;
   --good: #17693f; --good-bg: #e2f4e9; --bad: #a93127; --bad-bg: #fbe9e6;
-  --h1: #cfe5e1; --h2: #8cc6bf; --h3: #3f9890; --h4: #0d6b66;
+  --h0: #e2e6e5; --h1: #bfe0da; --h2: #8cc6bf; --h3: #3f9890; --h4: #0d6b66;
   --display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
@@ -28,7 +28,7 @@
   --bg: #10191b; --grid: #162225; --fg: #e6eeec; --muted: #9db0ae; --surface: #18262a; --line: #2f4346;
   --accent: #4fc4ba; --accent-ink: #08201f; --mark: #5c5000; --mark-fg: #fff4b0;
   --good: #6ad698; --good-bg: #12301f; --bad: #ff9c8f; --bad-bg: #3a1a16;
-  --h1: #1d3a3a; --h2: #24605b; --h3: #33918a; --h4: #4fc4ba;
+  --h0: #24363a; --h1: #1d4743; --h2: #24605b; --h3: #33918a; --h4: #4fc4ba;
 } }
 * { box-sizing: border-box; }
 html { padding-top: env(safe-area-inset-top, 0px); }
@@ -95,7 +95,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal .dow { text-align: center; font: 500 .75rem var(--mono); color: var(--muted); }
-.cal button { aspect-ratio: 1; border-radius: 6px; border: 1.5px solid transparent; background: var(--grid); color: var(--fg); font: 500 .8rem var(--mono); cursor: pointer; padding: 0; }
+.cal button { aspect-ratio: 1; border-radius: 6px; border: 1.5px solid transparent; background: var(--h0); color: var(--fg); font: 500 .8rem var(--mono); cursor: pointer; padding: 0; }
 .cal button[data-l="1"] { background: var(--h1); } .cal button[data-l="2"] { background: var(--h2); }
 .cal button[data-l="3"] { background: var(--h3); color: #fff; } .cal button[data-l="4"] { background: var(--h4); color: var(--accent-ink); }
 .cal button[data-l="x"] { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
@@ -318,7 +318,7 @@ details[open] > summary::after { content: "접기 ▴"; }
     out.push(h("div", { class: "card" },
       h("div", { class: "bar" }, h("h3", null, "5주 달력"), w !== null ? h("span", { class: "rate" }, `최근 7일 ${w}%`) : null),
       h("div", { class: "cal" }, ["월", "화", "수", "목", "금", "토", "일"].map(d => h("span", { class: "dow" }, d)), cells),
-      h("div", { class: "legend" }, h("i", { style: "border:1px dashed var(--line)" }), "할 루틴 없음", h("span", { style: "margin-left:8px" }, "적게"), [0, 1, 2, 3, 4].map(l => h("i", { style: `background:${l ? `var(--h${l})` : "var(--grid)"}` })), "모두 함")));
+      h("div", { class: "legend" }, h("i", { style: "border:1px dashed var(--line)" }), "할 루틴 없음", h("span", { style: "margin-left:8px" }, "적게"), [0, 1, 2, 3, 4].map(l => h("i", { style: `background:${l ? `var(--h${l})` : "var(--h0)"}` })), "모두 함")));
     // 루틴별 최근 4주
     const live = DB.items.filter(it => !it.end);
     out.push(h("div", { class: "card" }, h("h3", null, "루틴별 최근 4주"),
