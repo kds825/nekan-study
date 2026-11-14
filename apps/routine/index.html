@@ -127,7 +127,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .rlist { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
 .rlist > .item { border: 0; border-radius: 0; border-top: 1px solid var(--line); padding: 12px 14px; }
 .rlist > .item:first-child, .rlist > form:first-child { border-top: 0; }
-.rlist > form.card { border: 0; border-radius: 0; border-top: 1px solid var(--line); background: var(--bg); }
+.rlist > form.card { border: 0; border-radius: 0; border-top: 1px solid var(--line); background: var(--bg); box-shadow: inset 3px 0 0 var(--accent); }   /* 고치는 줄은 왼쪽 강조선 */
 .rlist .icon-btn { border-color: transparent; background: transparent; }
 .rlist .icon-btn:hover:not([disabled]) { background: var(--bg); border-color: var(--line); }
 .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
@@ -414,9 +414,11 @@ details[open] > summary::after { content: "접기 ▴"; }
           ev.preventDefault(); if (!e.name.trim()) return;
           Object.assign(it, { name: e.name.trim().slice(0, 60), note: e.note.trim().slice(0, 200), slot: e.slot, days: e.days.slice().sort() }); S.edit = null; save(); render();
         } },
+          h("p", { class: "small muted" }, "고치는 중"),
           h("input", { "aria-label": "루틴 이름", maxlength: "60", value: e.name, oninput: ev => { e.name = ev.target.value; } }),
           h("input", { "aria-label": "자세히", placeholder: "자세히 (선택)", maxlength: "200", value: e.note, oninput: ev => { e.note = ev.target.value; } }),
-          slotPicker(e), daysPicker(e),
+          h("p", { class: "small muted" }, "언제 하나요?"), slotPicker(e),
+          h("p", { class: "small muted" }, "무슨 요일에 하나요?"), daysPicker(e),
           h("div", { class: "row" }, h("button", { class: "btn", type: "submit" }, "저장"),
             h("button", { class: "btn ghost", type: "button", onclick: () => { S.edit = null; render(); } }, "취소"),
             h("button", { class: "btn danger", type: "button", onclick: () => {
