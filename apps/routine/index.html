@@ -104,7 +104,9 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .check .detail { font: 400 .84rem/1.5 var(--body); color: var(--muted); margin-top: 2px; }
 .check[aria-pressed="true"] .nm { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
 @media (prefers-reduced-motion: reduce) { .check { transition: none; } .check:active { transform: none; } }
-.check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 키보드로 움직일 때 지금 위치를 모든 버튼·링크에서 같은 테두리로 보여 준다 */
+button:focus-visible, a:focus-visible, label.btn:focus-visible, summary:focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+.tabs button:focus-visible { outline-offset: -2px; outline-color: var(--mark); }
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal .dow { text-align: center; font: 500 .75rem var(--mono); color: var(--muted); }
 .cal button { aspect-ratio: 1; border-radius: 6px; border: 1.5px solid transparent; background: var(--h0); color: var(--fg); font: 500 .8rem var(--mono); cursor: pointer; padding: 0; }
@@ -129,7 +131,8 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .memos { display: flex; flex-direction: column; margin: 0 -16px -14px; }
 .memo { display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%; padding: 10px 16px; background: none; border: 0; border-top: 1px solid var(--line); color: var(--fg); font: 400 .95rem/1.55 var(--body); cursor: pointer; }
 .memo time { font: 500 .78rem var(--mono); color: var(--accent); }
-.memo:hover, .memo:focus-visible { background: var(--bg); outline: none; }
+.memo:hover, .memo:focus-visible { background: var(--bg); }
+.memo:focus-visible { outline-offset: -3px; }
 /* 루틴 목록: 카드 하나 안에 구분선으로 나눈 줄 */
 .listhead { font-size: 1.2rem; margin-bottom: -6px; }
 .rlist { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
