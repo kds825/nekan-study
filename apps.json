@@ -23,6 +23,15 @@
       "addedAt": "2026-11-11"
     },
     {
+      "id": "routine",
+      "name": "하루 루틴",
+      "description": "매일 하고 싶은 일을 아침·낮·저녁으로 나눠 체크하고, 지난 5주를 달력으로 돌아봅니다.",
+      "path": "apps/routine/",
+      "icon": "check",
+      "status": "live",
+      "addedAt": "2026-11-15"
+    },
+    {
       "id": "meeting-english",
       "name": "회의 영어",
       "description": "회의 영어를 읽고, 듣고, 말하는 하루 10분 학습. 출퇴근 운전 중 듣기와 단어 복습도 있습니다.",

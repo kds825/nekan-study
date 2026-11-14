@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>하루 루틴</title>
+<meta name="description" content="매일 하고 싶은 일을 아침·낮·저녁으로 나눠 체크하고, 지난 기록을 달력으로 보는 루틴 앱.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d6b66">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%230d6b66'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 공부방과 같은 모눈종이 바탕, 위쪽 탭(오늘·기록·루틴), 한 줄 단에 카드를 쌓는다.
+   루틴과 체크 기록은 이 브라우저의 localStorage('routine-' 키)에만 둔다. */
+:root {
+  color-scheme: light dark;
+  --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
+  --accent: #0d6b66; --accent-ink: #ffffff; --mark: #ffe45c; --mark-fg: #16282b;
+  --good: #17693f; --good-bg: #e2f4e9; --bad: #a93127; --bad-bg: #fbe9e6;
+  --h1: #cfe5e1; --h2: #8cc6bf; --h3: #3f9890; --h4: #0d6b66;
+  --display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #10191b; --grid: #162225; --fg: #e6eeec; --muted: #9db0ae; --surface: #18262a; --line: #2f4346;
+  --accent: #4fc4ba; --accent-ink: #08201f; --mark: #5c5000; --mark-fg: #fff4b0;
+  --good: #6ad698; --good-bg: #12301f; --bad: #ff9c8f; --bad-bg: #3a1a16;
+  --h1: #1d3a3a; --h2: #24605b; --h3: #33918a; --h4: #4fc4ba;
+} }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background-color: var(--bg); color: var(--fg); font: 400 16px/1.65 var(--body); word-break: keep-all; overflow-wrap: anywhere;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#app { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.25; margin: 0; }
+h1 { font-size: 2rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+.muted { color: var(--muted); } .small { font-size: .88rem; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.back { display: inline-flex; align-items: center; min-height: 40px; color: var(--accent); text-decoration: none; font-weight: 500; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; position: sticky; top: 0; z-index: 3; background: var(--bg); padding-block: 6px; }
+.tabs button { min-height: 44px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--accent); font: 400 1.05rem var(--display); cursor: pointer; }
+.tabs button[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.card { padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
+input, textarea { width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; min-height: 44px; }
+textarea { min-height: 72px; resize: vertical; }
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn { min-height: 44px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font: 700 .95rem var(--body); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+.btn[disabled] { opacity: .5; cursor: default; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { min-height: 40px; min-width: 40px; padding: 4px 12px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font: 500 .9rem var(--body); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.note { padding: 10px 14px; border-radius: 6px; border: 1.5px solid var(--line); font-size: .9rem; }
+.note.good { background: var(--good-bg); color: var(--good); border-color: var(--good); }
+.note.bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+.progress { height: 10px; border-radius: 5px; background: var(--grid); overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--accent); transition: width .25s; }
+.daynav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; text-align: center; }
+.daynav button { min-height: 44px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--accent); font: 700 1.1rem var(--body); cursor: pointer; }
+.daynav button[disabled] { opacity: .35; cursor: default; }
+.slot { font: 500 .8rem var(--mono); color: var(--muted); letter-spacing: .04em; margin-top: 4px; }
+.check { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 56px; text-align: left; padding: 10px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; color: inherit; font: 500 1.02rem var(--body); cursor: pointer; }
+.check .box { width: 28px; height: 28px; flex: none; border-radius: 7px; border: 2px solid var(--accent); display: grid; place-items: center; }
+.check .box svg { width: 18px; height: 18px; opacity: 0; }
+.check[aria-pressed="true"] { border-color: var(--accent); }
+.check[aria-pressed="true"] .box { background: var(--accent); }
+.check[aria-pressed="true"] .box svg { opacity: 1; }
+.check[aria-pressed="true"] .label { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal .dow { text-align: center; font: 500 .75rem var(--mono); color: var(--muted); }
+.cal button { aspect-ratio: 1; border-radius: 6px; border: 1.5px solid transparent; background: var(--grid); color: var(--fg); font: 500 .8rem var(--mono); cursor: pointer; padding: 0; }
+.cal button[data-l="1"] { background: var(--h1); } .cal button[data-l="2"] { background: var(--h2); }
+.cal button[data-l="3"] { background: var(--h3); color: #fff; } .cal button[data-l="4"] { background: var(--h4); color: var(--accent-ink); }
+.cal button[data-l="x"] { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+.cal button.today { border-color: var(--fg); }
+.cal button[disabled] { background: transparent; color: var(--line); cursor: default; }
+.legend { display: flex; gap: 4px; align-items: center; font-size: .78rem; color: var(--muted); }
+.legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.strip { display: grid; grid-template-columns: repeat(28, 1fr); gap: 2px; }
+.strip i { height: 14px; border-radius: 2px; background: var(--grid); }
+.strip i.on { background: var(--accent); }
+.strip i.off { background: transparent; }
+.item { display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; }
+.item .who { flex: 1; min-width: 0; }
+.icon-btn { min-width: 40px; min-height: 40px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--accent); font: 700 1rem var(--body); cursor: pointer; }
+.icon-btn[disabled] { opacity: .35; cursor: default; }
+details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
+.rate { font: 500 .85rem var(--mono); color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+  /* 이 앱은 'routine-'로 시작하는 키만 쓴다. 공부방 첫 화면에는 숫자 요약 한 줄만 넘긴다. */
+  const KEY = "routine-data-v1";
+  const app = document.getElementById("app");
+  const SLOTS = [["am", "아침"], ["day", "낮"], ["pm", "저녁"], ["any", "언제든"]];
+  const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+  const ALL = [0, 1, 2, 3, 4, 5, 6];
+  const SUGGEST = [["물 한 잔 마시기", "am"], ["스트레칭 5분", "am"], ["회의 영어 10분", "day"], ["네칸 공부 한 묶음", "day"], ["30분 걷기", "pm"], ["내일 할 일 적기", "pm"], ["일찍 자기", "pm"]];
+  let DB = { version: 1, items: [], done: {}, memo: {} };
+  const S = { route: "today", day: null, draft: { name: "", slot: "any", days: ALL.slice() }, edit: null, msg: "", pick: new Set() };
+
+  /* ---------- 작은 유틸 ---------- */
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "value") el.value = v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat(Infinity)) if (c !== null && c !== undefined && c !== false) el.append(c);
+    return el;
+  }
+  const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };   // 이 기기 시간대의 날짜
+  const addDays = (s, n) => new Date(Date.parse(s + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+  const dowOf = s => new Date(s + "T00:00:00Z").getUTCDay();
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const fmtDay = s => { const [, m, d] = s.split("-"); return `${+m}월 ${+d}일 (${DOW[dowOf(s)]})`; };
+  const daysLabel = days => days.length === 7 ? "매일" : days.join() === "1,2,3,4,5" ? "평일" : days.join() === "0,6" ? "주말" : days.map(d => DOW[d]).join("·");
+  const tick = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4L16 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-ink)"/></svg>';
+
+  /* 그날 해야 하는 루틴: 만든 날 이후이고, 요일이 맞고, 지운 날 전이다. */
+  const scheduled = (it, day) => day >= it.start && (!it.end || day < it.end) && it.days.includes(dowOf(day));
+  const dueOn = day => DB.items.filter(it => scheduled(it, day));
+  const doneOn = day => new Set(DB.done[day] || []);
+  function dayRate(day) {
+    const due = dueOn(day); if (!due.length) return null;
+    const d = doneOn(day); const n = due.filter(it => d.has(it.id)).length;
+    return { n, of: due.length, r: n / due.length };
+  }
+  const level = r => r === null ? 0 : r.n === 0 ? 0 : r.r < .34 ? 1 : r.r < .67 ? 2 : r.r < 1 ? 3 : 4;
+
+  function load() {
+    try { const d = JSON.parse(localStorage.getItem(KEY) || "null"); if (d && Array.isArray(d.items)) DB = { done: {}, memo: {}, ...d }; } catch { /* 비어 있으면 새로 시작 */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); publishSummary(); return true; }
+    catch { S.msg = "이 브라우저에 저장하지 못했습니다. 시크릿 모드라면 일반 창에서 열어 주세요."; return false; }
+  }
+  function weekRate(end) {
+    let n = 0, of = 0;
+    for (let i = 0; i < 7; i++) { const r = dayRate(addDays(end, -i)); if (r) { n += r.n; of += r.of; } }
+    return of ? Math.round(n / of * 100) : null;
+  }
+  function publishSummary() {
+    const t = dayRate(today()), w = weekRate(today());
+    const live = DB.items.filter(it => !it.end).length;
+    const text = !live ? "아직 만든 루틴이 없습니다" : (t ? `오늘 ${t.n}/${t.of}` : "오늘은 쉬는 날") + (w !== null ? ` · 최근 7일 ${w}%` : "");
+    try { localStorage.setItem("platform-summary:routine", JSON.stringify({ text, at: new Date().toISOString() })); } catch { /* 요약은 없어도 된다 */ }
+  }
+
+  /* ---------- 라우팅 ---------- */
+  function parseHash() {
+    const r = location.hash.slice(1);
+    if (/^d-\d{4}-\d{2}-\d{2}$/.test(r)) return { route: "today", day: r.slice(2) };
+    if (["history", "manage"].includes(r)) return { route: r, day: null };
+    return { route: "today", day: null };
+  }
+  function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else render(); }
+  window.addEventListener("hashchange", () => { Object.assign(S, parseHash(), { msg: "" }); render(); window.scrollTo(0, 0); });
+  /* 앱을 켜 둔 채 날짜가 바뀌면 오늘 화면을 새 날짜로 다시 그린다. */
+  let shownToday = today();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && today() !== shownToday) { shownToday = today(); publishSummary(); render(); } });
+
+  function header(title, sub) {
+    const tabs = [["today", "오늘"], ["history", "기록"], ["manage", "루틴"]];
+    return [
+      h("div", { class: "bar" }, h("a", { class: "back", href: "../../" }, "← 공부방")),
+      h("div", null, h("h1", null, title), sub ? h("p", { class: "muted small" }, sub) : null),
+      h("nav", { class: "tabs", "aria-label": "하루 루틴 메뉴" }, tabs.map(([r, l]) =>
+        h("button", { "aria-current": S.route === r ? "page" : null, onclick: () => go(r) }, l))),
+      S.msg ? h("div", { class: "note bad", role: "alert" }, S.msg) : null];
+  }
+
+  /* ---------- 오늘 ---------- */
+  function viewToday() {
+    const t = today(), day = S.day && S.day <= t ? S.day : t;
+    const due = dueOn(day), done = doneOn(day);
+    const n = due.filter(it => done.has(it.id)).length;
+    const rest = DB.items.filter(it => !it.end && !scheduled(it, day) && day >= it.start).length;
+    const toggle = it => {
+      const s = doneOn(day); s.has(it.id) ? s.delete(it.id) : s.add(it.id);
+      if (s.size) DB.done[day] = [...s]; else delete DB.done[day];
+      save(); render();
+    };
+    const out = [header(day === t ? "오늘" : "지난 날", day === t ? "할 일을 누르면 체크됩니다. 다시 누르면 풀립니다." : "지난 날의 체크를 고칠 수 있습니다.")];
+    out.push(h("div", { class: "daynav" },
+      h("button", { "aria-label": "전날", onclick: () => go("d-" + addDays(day, -1)) }, "‹"),
+      h("strong", null, fmtDay(day)),
+      h("button", { "aria-label": "다음 날", disabled: day >= t, onclick: () => go(addDays(day, 1) === t ? "today" : "d-" + addDays(day, 1)) }, "›")));
+    if (!DB.items.length) {
+      out.push(h("div", { class: "card" }, h("h3", null, "루틴을 먼저 만들어 주세요"),
+        h("p", { class: "small" }, "매일 하고 싶은 일을 넣으면 이 화면에서 하나씩 체크합니다. 아래에서 여러 개 고르거나 '루틴' 탭에서 직접 적으세요."),
+        suggestPicker(),
+        h("div", { class: "row" },
+          h("button", { class: "btn", disabled: !S.pick.size, onclick: () => { SUGGEST.filter(([n]) => S.pick.has(n)).forEach(([n, slot]) => addItem(n, slot, ALL)); S.pick.clear(); render(); } }, S.pick.size ? `고른 ${S.pick.size}개로 시작` : "골라 주세요"),
+          h("button", { class: "btn ghost", onclick: () => go("manage") }, "직접 만들기"))));
+      return out;
+    }
+    if (!due.length) out.push(h("div", { class: "note" }, DB.items.some(it => it.start <= day) ? "이날은 할 루틴이 없습니다. 쉬어 가는 날이에요." : "루틴을 만들기 전 날짜입니다. 기록은 루틴을 만든 날부터 셉니다."));
+    else {
+      out.push(h("div", { class: "card" },
+        h("div", { class: "bar" }, h("h3", null, `${n} / ${due.length}`), h("span", { class: "rate" }, Math.round(n / due.length * 100) + "%")),
+        h("div", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(due.length), "aria-valuenow": String(n) }, h("span", { style: `width:${n / due.length * 100}%` }))));
+      if (n === due.length) out.push(h("div", { class: "note good", role: "status" }, day === t ? "오늘 루틴을 모두 마쳤어요. 수고했어요." : "이날 루틴을 모두 마쳤어요."));
+      for (const [k, label] of SLOTS) {
+        const list = due.filter(it => it.slot === k);
+        if (!list.length) continue;
+        out.push(h("div", { class: "stack" }, h("p", { class: "slot" }, label),
+          list.map(it => { const b = h("button", { class: "check", "aria-pressed": String(done.has(it.id)), onclick: () => toggle(it) },
+            h("span", { class: "box" }), h("span", { class: "label" }, it.name)); b.querySelector(".box").innerHTML = tick; return b; })));
+      }
+    }
+    if (rest) out.push(h("p", { class: "muted small" }, `이날 요일이 아니어서 빠진 루틴 ${rest}개`));
+    out.push(h("div", { class: "card" }, h("label", { class: "small muted", for: "memo" }, "하루 한 줄 메모 (선택)"),
+      h("textarea", { id: "memo", placeholder: "오늘 어땠나요?", value: DB.memo[day] || "",
+        onchange: e => { const v = e.target.value.trim(); if (v) DB.memo[day] = v; else delete DB.memo[day]; save(); } })));
+    return out;
+  }
+
+  /* ---------- 기록 ---------- */
+  function viewHistory() {
+    const t = today();
+    const out = [header("기록", "지난 5주를 한눈에 봅니다. 날짜를 누르면 그날 체크를 고칠 수 있어요.")];
+    if (!DB.items.length) { out.push(h("p", { class: "muted" }, "아직 루틴이 없습니다.")); return out; }
+    // 월요일부터 시작하는 5주 달력
+    const back = (dowOf(t) + 6) % 7;
+    const start = addDays(t, -back - 28);
+    const cells = [];
+    for (let i = 0; i < 35; i++) {
+      const d = addDays(start, i);
+      if (d > t) { cells.push(h("button", { disabled: true, "aria-hidden": "true" }, String(+d.slice(8)))); continue; }
+      const r = dayRate(d);
+      cells.push(h("button", { "data-l": r ? String(level(r)) : "x", class: d === t ? "today" : null, "aria-label": `${fmtDay(d)} ${r ? `${r.n}/${r.of}` : "루틴 없음"}`, onclick: () => go(d === t ? "today" : "d-" + d) }, d.endsWith("-01") ? `${+d.slice(5, 7)}/1` : String(+d.slice(8))));
+    }
+    const w = weekRate(t);
+    out.push(h("div", { class: "card" },
+      h("div", { class: "bar" }, h("h3", null, "5주 달력"), w !== null ? h("span", { class: "rate" }, `최근 7일 ${w}%`) : null),
+      h("div", { class: "cal" }, ["월", "화", "수", "목", "금", "토", "일"].map(d => h("span", { class: "dow" }, d)), cells),
+      h("div", { class: "legend" }, h("i", { style: "border:1px dashed var(--line)" }), "할 루틴 없음", "00a0· 적게", [0, 1, 2, 3, 4].map(l => h("i", { style: `background:${l ? `var(--h${l})` : "var(--grid)"}` })), "모두 함")));
+    // 루틴별 최근 4주
+    const live = DB.items.filter(it => !it.end);
+    out.push(h("div", { class: "card" }, h("h3", null, "루틴별 최근 4주"),
+      live.map(it => {
+        let n = 0, of = 0; const marks = [];
+        for (let i = 27; i >= 0; i--) {
+          const d = addDays(t, -i), s = scheduled(it, d), on = s && doneOn(d).has(it.id);
+          if (s) { of++; if (on) n++; }
+          marks.push(h("i", { class: !s ? "off" : on ? "on" : null }));
+        }
+        return h("div", { class: "stack", style: "gap:4px" },
+          h("div", { class: "bar" }, h("span", null, it.name), h("span", { class: "rate" }, of ? `${n}/${of} · ${Math.round(n / of * 100)}%` : "아직 없음")),
+          h("div", { class: "strip", "aria-hidden": "true" }, marks));
+      })));
+    const memos = Object.entries(DB.memo).filter(([d]) => d >= addDays(t, -27)).sort((a, b) => b[0].localeCompare(a[0]));
+    if (memos.length) out.push(h("div", { class: "card" }, h("h3", null, "최근 메모"),
+      memos.map(([d, m]) => h("p", { class: "small" }, h("button", { class: "back small", onclick: () => go(d === t ? "today" : "d-" + d) }, fmtDay(d)), " ", m))));
+    return out;
+  }
+
+  /* ---------- 루틴 관리 ---------- */
+  function suggestPicker() {
+    return h("div", { class: "chips", role: "group", "aria-label": "추천 루틴" }, SUGGEST.map(([name]) =>
+      h("button", { class: "chip", "aria-pressed": String(S.pick.has(name)), onclick: () => { S.pick.has(name) ? S.pick.delete(name) : S.pick.add(name); render(); } }, name)));
+  }
+  function addItem(name, slot, days) {
+    DB.items.push({ id: uid(), name: name.trim().slice(0, 60), slot, days: days.slice().sort(), start: today() });
+    save();
+  }
+  function daysPicker(target) {
+    const set = days => { target.days = days; render(); };
+    const has = d => target.days.includes(d);
+    return [h("div", { class: "chips", role: "group", "aria-label": "자주 쓰는 요일" },
+        [["매일", ALL], ["평일", [1, 2, 3, 4, 5]], ["주말", [0, 6]]].map(([l, ds]) =>
+          h("button", { type: "button", class: "chip", "aria-pressed": String(target.days.join() === ds.join()), onclick: () => set(ds.slice()) }, l))),
+      h("div", { class: "chips", role: "group", "aria-label": "요일" }, [1, 2, 3, 4, 5, 6, 0].map(d =>
+        h("button", { type: "button", class: "chip", "aria-pressed": String(has(d)), onclick: () => { const ds = has(d) ? target.days.filter(x => x !== d) : [...target.days, d]; if (ds.length) set(ds.sort()); } }, DOW[d])))];
+  }
+  function slotPicker(target) {
+    return h("div", { class: "chips", role: "group", "aria-label": "때" }, SLOTS.map(([k, l]) =>
+      h("button", { type: "button", class: "chip", "aria-pressed": String(target.slot === k), onclick: () => { target.slot = k; render(); } }, l)));
+  }
+  function viewManage() {
+    const d = S.draft;
+    const live = DB.items.filter(it => !it.end);
+    const out = [header("루틴", `지금 ${live.length}개. 지운 루틴의 지난 기록은 달력에 남습니다.`)];
+    out.push(h("form", { class: "card", onsubmit: e => {
+      e.preventDefault(); if (!d.name.trim()) return;
+      addItem(d.name, d.slot, d.days); S.draft = { name: "", slot: d.slot, days: d.days }; render();
+      document.getElementById("rname")?.focus();
+    } },
+      h("h3", null, "루틴 넣기"),
+      h("input", { id: "rname", "aria-label": "루틴 이름", placeholder: "예: 물 한 잔 마시기", maxlength: "60", autocomplete: "off", value: d.name, oninput: e => { d.name = e.target.value; } }),
+      h("p", { class: "small muted" }, "언제 하나요?"), slotPicker(d),
+      h("p", { class: "small muted" }, "무슨 요일에 하나요?"), daysPicker(d),
+      h("button", { class: "btn", type: "submit" }, "넣기")));
+    const left = SUGGEST.filter(([n]) => !live.some(it => it.name === n));
+    if (left.length) out.push(h("details", { class: "card", open: !live.length }, h("summary", null, "추천에서 고르기"),
+      h("div", { class: "chips" }, left.map(([name, slot]) => h("button", { class: "chip", onclick: () => { addItem(name, slot, ALL); render(); document.querySelector("details")?.setAttribute("open", ""); } }, "+ " + name)))));
+    const move = (it, dir) => {
+      const i = DB.items.indexOf(it); let j = i + dir;
+      while (DB.items[j] && DB.items[j].end) j += dir;
+      if (!DB.items[j]) return;
+      [DB.items[i], DB.items[j]] = [DB.items[j], DB.items[i]]; save(); render();
+    };
+    out.push(h("div", { class: "stack" }, live.map((it, k) => {
+      if (S.edit && S.edit.id === it.id) {
+        const e = S.edit;
+        return h("form", { class: "card", onsubmit: ev => {
+          ev.preventDefault(); if (!e.name.trim()) return;
+          Object.assign(it, { name: e.name.trim().slice(0, 60), slot: e.slot, days: e.days.slice().sort() }); S.edit = null; save(); render();
+        } },
+          h("input", { "aria-label": "루틴 이름", maxlength: "60", value: e.name, oninput: ev => { e.name = ev.target.value; } }),
+          slotPicker(e), daysPicker(e),
+          h("div", { class: "row" }, h("button", { class: "btn", type: "submit" }, "저장"),
+            h("button", { class: "btn ghost", type: "button", onclick: () => { S.edit = null; render(); } }, "취소"),
+            h("button", { class: "btn danger", type: "button", onclick: () => {
+              if (!confirm(`'${it.name}'을(를) 지울까요? 오늘부터 목록에서 빠지고, 지난 기록은 달력에 남습니다.`)) return;
+              if (it.start >= today()) DB.items = DB.items.filter(x => x !== it); else it.end = today();
+              S.edit = null; save(); render();
+            } }, "지우기")));
+      }
+      return h("div", { class: "item" },
+        h("div", { class: "who" }, h("strong", null, it.name), h("div", { class: "small muted" }, `${SLOTS.find(s => s[0] === it.slot)[1]} · ${daysLabel(it.days)}`)),
+        h("button", { class: "icon-btn", "aria-label": "위로", disabled: k === 0, onclick: () => move(it, -1) }, "↑"),
+        h("button", { class: "icon-btn", "aria-label": "아래로", disabled: k === live.length - 1, onclick: () => move(it, 1) }, "↓"),
+        h("button", { class: "icon-btn", "aria-label": "고치기", onclick: () => { S.edit = { id: it.id, name: it.name, slot: it.slot, days: it.days.slice() }; render(); } }, "✎"));
+    })));
+    out.push(h("div", { class: "card" }, h("h3", null, "백업과 지우기"),
+      h("p", { class: "small" }, "루틴과 체크 기록은 이 브라우저에만 있습니다. 다른 기기로 옮기거나 브라우저 데이터를 지우기 전에 백업 파일로 저장하세요."),
+      h("div", { class: "row" },
+        h("button", { class: "btn ghost", disabled: !DB.items.length, onclick: () => {
+          const url = URL.createObjectURL(new Blob([JSON.stringify({ app: "routine", ...DB, exportedAt: new Date().toISOString() }, null, 1)], { type: "application/json" }));
+          const a = h("a", { href: url, download: `routine-백업-${today()}.json` }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+        } }, "백업 파일 저장"),
+        h("label", { class: "btn ghost", for: "restore" }, "백업 불러오기"),
+        h("input", { id: "restore", type: "file", accept: ".json,application/json", hidden: true, onchange: async e => {
+          const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+          try {
+            const d = JSON.parse(await f.text());
+            if (d.app !== "routine" || !Array.isArray(d.items)) throw 0;
+            if (DB.items.length && !confirm("지금 기록을 백업 파일 내용으로 바꿀까요?")) return;
+            DB = { version: 1, items: d.items, done: d.done || {}, memo: d.memo || {} }; S.msg = ""; save(); render();
+          } catch { S.msg = "하루 루틴 백업 파일이 아닙니다."; render(); }
+        } }),
+        h("button", { class: "btn danger", disabled: !DB.items.length, onclick: () => {
+          if (!confirm("루틴과 체크 기록을 모두 지울까요? 되돌릴 수 없습니다.")) return;
+          DB = { version: 1, items: [], done: {}, memo: {} }; try { localStorage.removeItem(KEY); } catch { /* 없으면 그만 */ } publishSummary(); render();
+        } }, "모두 지우기"))));
+    return out;
+  }
+
+  function render() {
+    const view = S.route === "history" ? viewHistory() : S.route === "manage" ? viewManage() : viewToday();
+    app.replaceChildren(...[view].flat(Infinity).filter(Boolean));
+  }
+
+  load();
+  Object.assign(S, parseHash());
+  publishSummary();
+  render();
+})();
+</script>
+</body>
+</html>
