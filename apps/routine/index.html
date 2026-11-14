@@ -63,7 +63,8 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .btn { min-height: 44px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font: 700 .95rem var(--body); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .btn.ghost { background: transparent; color: var(--accent); }
 .btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
-.btn[disabled] { opacity: .5; cursor: default; }
+/* 아직 누를 수 없는 버튼: 반투명 대신 회색 점선으로 분명히 */
+.btn[disabled] { cursor: default; background: transparent; color: var(--muted); border-color: var(--line); border-style: dashed; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { min-height: 40px; min-width: 40px; padding: 4px 12px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font: 500 .9rem var(--body); cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
