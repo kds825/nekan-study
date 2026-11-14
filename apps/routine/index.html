@@ -69,6 +69,12 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .daynav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; text-align: center; }
 .daynav button { min-height: 44px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--accent); font: 700 1.1rem var(--body); cursor: pointer; }
 .daynav button[disabled] { opacity: .35; cursor: default; }
+.hero { gap: 12px; padding: 12px 14px 16px; }
+.hero .daynav button { border-color: transparent; background: var(--bg); }
+.hero .score { display: flex; align-items: baseline; gap: 6px; padding-inline: 4px; }
+.hero .big { font: 400 3.2rem/1 var(--display); color: var(--accent); }
+.hero .of { font: 400 1.4rem/1 var(--display); color: var(--muted); }
+.hero .pct { margin-left: auto; font: 500 .95rem var(--mono); color: var(--muted); }
 .slot { font: 500 .8rem var(--mono); color: var(--muted); letter-spacing: .04em; margin-top: 4px; }
 .check { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 56px; text-align: left; padding: 10px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; color: inherit; font: 500 1.02rem var(--body); cursor: pointer; }
 .check .box { width: 28px; height: 28px; flex: none; border-radius: 7px; border: 2px solid var(--accent); display: grid; place-items: center; }
@@ -221,10 +227,16 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
       save(); render();
     };
     const out = [header(day === t ? "오늘" : "지난 날", day === t ? "할 일을 누르면 체크됩니다. 다시 누르면 풀립니다." : "지난 날의 체크를 고칠 수 있습니다.")];
-    out.push(h("div", { class: "daynav" },
+    const nav = h("div", { class: "daynav" },
       h("button", { "aria-label": "전날", onclick: () => go("d-" + addDays(day, -1)) }, "‹"),
       h("strong", null, fmtDay(day)),
-      h("button", { "aria-label": "다음 날", disabled: day >= t, onclick: () => go(addDays(day, 1) === t ? "today" : "d-" + addDays(day, 1)) }, "›")));
+      h("button", { "aria-label": "다음 날", disabled: day >= t, onclick: () => go(addDays(day, 1) === t ? "today" : "d-" + addDays(day, 1)) }, "›"));
+    /* 날짜 이동과 진행률을 카드 하나에 둔다. 할 일이 없는 날은 날짜 줄만 둔다. */
+    if (!DB.items.length || !due.length) out.push(nav);
+    else out.push(h("div", { class: "card hero" }, nav,
+      h("div", { class: "score" }, h("span", { class: "big" }, String(n)), h("span", { class: "of" }, `/ ${due.length}`),
+        h("span", { class: "pct" }, Math.round(n / due.length * 100) + "%")),
+      h("div", { class: "progress", role: "progressbar", "aria-label": "오늘 한 루틴", "aria-valuemin": "0", "aria-valuemax": String(due.length), "aria-valuenow": String(n) }, h("span", { style: `width:${n / due.length * 100}%` }))));
     if (!DB.items.length) {
       out.push(h("div", { class: "card" }, h("h3", null, "루틴을 먼저 만들어 주세요"),
         h("p", { class: "small" }, "매일 하고 싶은 일을 넣으면 이 화면에서 하나씩 체크합니다. 아래에서 여러 개 고르거나 '루틴' 탭에서 직접 적으세요."),
@@ -236,9 +248,6 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
     }
     if (!due.length) out.push(h("div", { class: "note" }, DB.items.some(it => it.start <= day) ? "이날은 할 루틴이 없습니다. 쉬어 가는 날이에요." : "루틴을 만들기 전 날짜입니다. 기록은 루틴을 만든 날부터 셉니다."));
     else {
-      out.push(h("div", { class: "card" },
-        h("div", { class: "bar" }, h("h3", null, `${n} / ${due.length}`), h("span", { class: "rate" }, Math.round(n / due.length * 100) + "%")),
-        h("div", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(due.length), "aria-valuenow": String(n) }, h("span", { style: `width:${n / due.length * 100}%` }))));
       if (n === due.length) out.push(h("div", { class: "note good", role: "status" }, day === t ? "오늘 루틴을 모두 마쳤어요. 수고했어요." : "이날 루틴을 모두 마쳤어요."));
       for (const [k, label] of SLOTS) {
         const list = due.filter(it => it.slot === k);
