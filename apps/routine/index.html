@@ -148,6 +148,8 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .resttag { font-size: .8rem; padding: 2px 9px; border-radius: 12px; border: 1px dashed var(--line); color: var(--muted); }
 .danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
 .small-btn { min-height: 36px; padding: 4px 12px; font-size: .85rem; }
+.pill { font-size: .8rem; color: var(--muted); padding: 2px 10px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.pill b { font: 700 .9rem var(--mono); color: var(--accent); }
 .pack { border-top: 1px solid var(--line); padding-top: 10px; }   /* 추천 묶음 사이 구분선 */
 .pack > .bar { min-height: 40px; }   /* 모두 넣기 버튼이 없는 줄도 높이를 맞춘다 */
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
@@ -320,7 +322,7 @@ details[open] > summary::after { content: "접기 ▴"; }
   /* ---------- 기록 ---------- */
   function viewHistory() {
     const t = today();
-    const out = [header("기록", "지난 5주를 한눈에 봅니다. 날짜를 누르면 그날 체크를 고칠 수 있어요.")];
+    const out = [header("기록", "날짜를 누르면 그날 체크를 고칠 수 있어요.")];
     if (!DB.items.length) { out.push(h("p", { class: "muted" }, "아직 루틴이 없습니다.")); return out; }
     // 월요일부터 시작하는 5주 달력
     const back = (dowOf(t) + 6) % 7;
@@ -334,7 +336,7 @@ details[open] > summary::after { content: "접기 ▴"; }
     }
     const w = weekRate(t);
     out.push(h("div", { class: "card" },
-      h("div", { class: "bar" }, h("h3", null, "5주 달력"), w !== null ? h("span", { class: "rate" }, `최근 7일 ${w}%`) : null),
+      h("div", { class: "bar" }, h("h3", null, "5주 달력"), w !== null ? h("span", { class: "pill" }, "최근 7일 ", h("b", null, w + "%")) : null),
       h("div", { class: "cal" }, ["월", "화", "수", "목", "금", "토", "일"].map(d => h("span", { class: "dow" }, d)), cells),
       h("div", { class: "legend" }, h("i", { style: "border:1px dashed var(--line)" }), "할 루틴 없음", h("span", { style: "margin-left:8px" }, "적게"), [0, 1, 2, 3, 4].map(l => h("i", { style: `background:${l ? `var(--h${l})` : "var(--h0)"}` })), "모두 함")));
     // 루틴별 최근 4주
