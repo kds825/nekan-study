@@ -76,7 +76,9 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .check[aria-pressed="true"] { border-color: var(--accent); }
 .check[aria-pressed="true"] .box { background: var(--accent); }
 .check[aria-pressed="true"] .box svg { opacity: 1; }
-.check[aria-pressed="true"] .label { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.check .label { display: flex; flex-direction: column; min-width: 0; }
+.check .detail { font: 400 .84rem/1.5 var(--body); color: var(--muted); margin-top: 2px; }
+.check[aria-pressed="true"] .nm { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1.5px; }
 .check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal .dow { text-align: center; font: 500 .75rem var(--mono); color: var(--muted); }
@@ -110,7 +112,26 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
   const SLOTS = [["am", "아침"], ["day", "낮"], ["pm", "저녁"], ["any", "언제든"]];
   const DOW = ["일", "월", "화", "수", "목", "금", "토"];
   const ALL = [0, 1, 2, 3, 4, 5, 6];
-  const SUGGEST = [["물 한 잔 마시기", "am"], ["스트레칭 5분", "am"], ["회의 영어 10분", "day"], ["네칸 공부 한 묶음", "day"], ["30분 걷기", "pm"], ["내일 할 일 적기", "pm"], ["일찍 자기", "pm"]];
+  /* 추천 묶음: [이름, 때, 요일, 자세히]. 사용자가 고른 뒤 '루틴' 탭에서 고칠 수 있다. */
+  const PACKS = [
+    { name: "아침에 일어나서", items: [
+      ["일어나자마자 물 한 잔", "am", ALL, "미지근한 물 한 컵"],
+      ["이불 정리", "am", ALL, ""],
+      ["창문 열고 햇빛 보기", "am", ALL, "5분, 바깥 빛을 눈에 넣기"],
+      ["아침 스트레칭 5분", "am", ALL, "목·어깨 돌리기 → 고양이-소 자세 10회 → 허벅지 뒤 늘리기 30초씩"],
+      ["오늘 할 일 3가지 적기", "am", ALL, "휴대폰 알림은 이걸 적은 뒤에 보기"],
+      ["아침 먹기", "am", ALL, "달걀·두부·요거트처럼 단백질 하나 넣기"]] },
+    { name: "운동 루틴 (주 6일, 일요일 쉼)", items: [
+      ["상체 근력", "pm", [1, 4], "푸시업 10회 × 3세트 · 덤벨(물병) 로우 12회 × 3세트 · 플랭크 30초 × 3세트"],
+      ["하체 근력", "pm", [2, 5], "스쿼트 15회 × 3세트 · 런지 좌우 10회 × 3세트 · 힙 브리지 15회 × 3세트"],
+      ["유산소 30분", "pm", [3, 6], "빠르게 걷기·자전거·달리기 중 하나, 말은 되지만 숨이 조금 찰 정도"],
+      ["마무리 스트레칭 10분", "pm", [1, 2, 3, 4, 5, 6], "종아리·허벅지 앞뒤·가슴·어깨, 부위마다 30초"]] },
+    { name: "그 밖에", items: [
+      ["회의 영어 10분", "day", ALL, ""],
+      ["네칸 공부 한 묶음", "day", ALL, ""],
+      ["내일 할 일 적기", "pm", ALL, ""],
+      ["12시 전에 눕기", "pm", ALL, "누운 뒤에는 휴대폰 보지 않기"]] }];
+  const SUGGEST = PACKS.flatMap(p => p.items);
   let DB = { version: 1, items: [], done: {}, memo: {} };
   const S = { route: "today", day: null, draft: { name: "", slot: "any", days: ALL.slice() }, edit: null, msg: "", pick: new Set() };
 
@@ -209,7 +230,7 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
         h("p", { class: "small" }, "매일 하고 싶은 일을 넣으면 이 화면에서 하나씩 체크합니다. 아래에서 여러 개 고르거나 '루틴' 탭에서 직접 적으세요."),
         suggestPicker(),
         h("div", { class: "row" },
-          h("button", { class: "btn", disabled: !S.pick.size, onclick: () => { SUGGEST.filter(([n]) => S.pick.has(n)).forEach(([n, slot]) => addItem(n, slot, ALL)); S.pick.clear(); render(); } }, S.pick.size ? `고른 ${S.pick.size}개로 시작` : "골라 주세요"),
+          h("button", { class: "btn", disabled: !S.pick.size, onclick: () => { SUGGEST.filter(([n]) => S.pick.has(n)).forEach(s => addItem(...s)); S.pick.clear(); render(); } }, S.pick.size ? `고른 ${S.pick.size}개로 시작` : "골라 주세요"),
           h("button", { class: "btn ghost", onclick: () => go("manage") }, "직접 만들기"))));
       return out;
     }
@@ -224,7 +245,7 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
         if (!list.length) continue;
         out.push(h("div", { class: "stack" }, h("p", { class: "slot" }, label),
           list.map(it => { const b = h("button", { class: "check", "aria-pressed": String(done.has(it.id)), onclick: () => toggle(it) },
-            h("span", { class: "box" }), h("span", { class: "label" }, it.name)); b.querySelector(".box").innerHTML = tick; return b; })));
+            h("span", { class: "box" }), h("span", { class: "label" }, h("span", { class: "nm" }, it.name), it.note ? h("span", { class: "detail" }, it.note) : null)); b.querySelector(".box").innerHTML = tick; return b; })));
       }
     }
     if (rest) out.push(h("p", { class: "muted small" }, `이날 요일이 아니어서 빠진 루틴 ${rest}개`));
@@ -276,11 +297,18 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
 
   /* ---------- 루틴 관리 ---------- */
   function suggestPicker() {
-    return h("div", { class: "chips", role: "group", "aria-label": "추천 루틴" }, SUGGEST.map(([name]) =>
-      h("button", { class: "chip", "aria-pressed": String(S.pick.has(name)), onclick: () => { S.pick.has(name) ? S.pick.delete(name) : S.pick.add(name); render(); } }, name)));
+    return PACKS.map(p => {
+      const all = p.items.every(([n]) => S.pick.has(n));
+      return h("div", { class: "stack", style: "gap:6px" },
+        h("div", { class: "bar" }, h("strong", { class: "small" }, p.name),
+          h("button", { class: "back small", onclick: () => { p.items.forEach(([n]) => all ? S.pick.delete(n) : S.pick.add(n)); render(); } }, all ? "모두 빼기" : "모두 고르기")),
+        h("div", { class: "chips", role: "group", "aria-label": p.name }, p.items.map(([name, , days]) =>
+          h("button", { class: "chip", "aria-pressed": String(S.pick.has(name)), onclick: () => { S.pick.has(name) ? S.pick.delete(name) : S.pick.add(name); render(); } },
+            name + (days.length < 7 ? ` (${daysLabel(days)})` : "")))));
+    });
   }
-  function addItem(name, slot, days) {
-    DB.items.push({ id: uid(), name: name.trim().slice(0, 60), slot, days: days.slice().sort(), start: today() });
+  function addItem(name, slot, days, note = "") {
+    DB.items.push({ id: uid(), name: name.trim().slice(0, 60), slot, days: days.slice().sort(), note: note.trim().slice(0, 200), start: today() });
     save();
   }
   function daysPicker(target) {
@@ -302,17 +330,27 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
     const out = [header("루틴", `지금 ${live.length}개. 지운 루틴의 지난 기록은 달력에 남습니다.`)];
     out.push(h("form", { class: "card", onsubmit: e => {
       e.preventDefault(); if (!d.name.trim()) return;
-      addItem(d.name, d.slot, d.days); S.draft = { name: "", slot: d.slot, days: d.days }; render();
+      addItem(d.name, d.slot, d.days, d.note || ""); S.draft = { name: "", note: "", slot: d.slot, days: d.days }; render();
       document.getElementById("rname")?.focus();
     } },
       h("h3", null, "루틴 넣기"),
       h("input", { id: "rname", "aria-label": "루틴 이름", placeholder: "예: 물 한 잔 마시기", maxlength: "60", autocomplete: "off", value: d.name, oninput: e => { d.name = e.target.value; } }),
+      h("input", { "aria-label": "자세히", placeholder: "자세히 (선택, 예: 스쿼트 15회 × 3세트)", maxlength: "200", autocomplete: "off", value: d.note || "", oninput: e => { d.note = e.target.value; } }),
       h("p", { class: "small muted" }, "언제 하나요?"), slotPicker(d),
       h("p", { class: "small muted" }, "무슨 요일에 하나요?"), daysPicker(d),
       h("button", { class: "btn", type: "submit" }, "넣기")));
-    const left = SUGGEST.filter(([n]) => !live.some(it => it.name === n));
-    if (left.length) out.push(h("details", { class: "card", open: !live.length }, h("summary", null, "추천에서 고르기"),
-      h("div", { class: "chips" }, left.map(([name, slot]) => h("button", { class: "chip", onclick: () => { addItem(name, slot, ALL); render(); document.querySelector("details")?.setAttribute("open", ""); } }, "+ " + name)))));
+    const has = n => live.some(it => it.name === n);
+    if (SUGGEST.some(([n]) => !has(n))) out.push(h("details", { class: "card", id: "packs", open: S.packsOpen || !live.length, ontoggle: e => { S.packsOpen = e.target.open; } },
+      h("summary", null, "추천 묶음에서 고르기 (아침·운동)"),
+      PACKS.map(p => {
+        const left = p.items.filter(([n]) => !has(n));
+        if (!left.length) return null;
+        return h("div", { class: "stack", style: "gap:6px" },
+          h("div", { class: "bar" }, h("strong", { class: "small" }, p.name),
+            h("button", { class: "back small", onclick: () => { left.forEach(s => addItem(...s)); render(); } }, `${left.length}개 모두 넣기`)),
+          h("div", { class: "chips" }, left.map(s => h("button", { class: "chip", onclick: () => { addItem(...s); render(); } },
+            "+ " + s[0] + (s[2].length < 7 ? ` (${daysLabel(s[2])})` : "")))));
+      })));
     const move = (it, dir) => {
       const i = DB.items.indexOf(it); let j = i + dir;
       while (DB.items[j] && DB.items[j].end) j += dir;
@@ -324,9 +362,10 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
         const e = S.edit;
         return h("form", { class: "card", onsubmit: ev => {
           ev.preventDefault(); if (!e.name.trim()) return;
-          Object.assign(it, { name: e.name.trim().slice(0, 60), slot: e.slot, days: e.days.slice().sort() }); S.edit = null; save(); render();
+          Object.assign(it, { name: e.name.trim().slice(0, 60), note: e.note.trim().slice(0, 200), slot: e.slot, days: e.days.slice().sort() }); S.edit = null; save(); render();
         } },
           h("input", { "aria-label": "루틴 이름", maxlength: "60", value: e.name, oninput: ev => { e.name = ev.target.value; } }),
+          h("input", { "aria-label": "자세히", placeholder: "자세히 (선택)", maxlength: "200", value: e.note, oninput: ev => { e.note = ev.target.value; } }),
           slotPicker(e), daysPicker(e),
           h("div", { class: "row" }, h("button", { class: "btn", type: "submit" }, "저장"),
             h("button", { class: "btn ghost", type: "button", onclick: () => { S.edit = null; render(); } }, "취소"),
@@ -337,10 +376,11 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
             } }, "지우기")));
       }
       return h("div", { class: "item" },
-        h("div", { class: "who" }, h("strong", null, it.name), h("div", { class: "small muted" }, `${SLOTS.find(s => s[0] === it.slot)[1]} · ${daysLabel(it.days)}`)),
+        h("div", { class: "who" }, h("strong", null, it.name), h("div", { class: "small muted" }, `${SLOTS.find(s => s[0] === it.slot)[1]} · ${daysLabel(it.days)}`),
+          it.note ? h("div", { class: "small muted" }, it.note) : null),
         h("button", { class: "icon-btn", "aria-label": "위로", disabled: k === 0, onclick: () => move(it, -1) }, "↑"),
         h("button", { class: "icon-btn", "aria-label": "아래로", disabled: k === live.length - 1, onclick: () => move(it, 1) }, "↓"),
-        h("button", { class: "icon-btn", "aria-label": "고치기", onclick: () => { S.edit = { id: it.id, name: it.name, slot: it.slot, days: it.days.slice() }; render(); } }, "✎"));
+        h("button", { class: "icon-btn", "aria-label": "고치기", onclick: () => { S.edit = { id: it.id, name: it.name, note: it.note || "", slot: it.slot, days: it.days.slice() }; render(); } }, "✎"));
     })));
     out.push(h("div", { class: "card" }, h("h3", null, "백업과 지우기"),
       h("p", { class: "small" }, "루틴과 체크 기록은 이 브라우저에만 있습니다. 다른 기기로 옮기거나 브라우저 데이터를 지우기 전에 백업 파일로 저장하세요."),
