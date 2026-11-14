@@ -253,7 +253,7 @@ details > summary { cursor: pointer; font-weight: 500; min-height: 32px; }
     out.push(h("div", { class: "card" },
       h("div", { class: "bar" }, h("h3", null, "5주 달력"), w !== null ? h("span", { class: "rate" }, `최근 7일 ${w}%`) : null),
       h("div", { class: "cal" }, ["월", "화", "수", "목", "금", "토", "일"].map(d => h("span", { class: "dow" }, d)), cells),
-      h("div", { class: "legend" }, h("i", { style: "border:1px dashed var(--line)" }), "할 루틴 없음", "00a0· 적게", [0, 1, 2, 3, 4].map(l => h("i", { style: `background:${l ? `var(--h${l})` : "var(--grid)"}` })), "모두 함")));
+      h("div", { class: "legend" }, h("i", { style: "border:1px dashed var(--line)" }), "할 루틴 없음", h("span", { style: "margin-left:8px" }, "적게"), [0, 1, 2, 3, 4].map(l => h("i", { style: `background:${l ? `var(--h${l})` : "var(--grid)"}` })), "모두 함")));
     // 루틴별 최근 4주
     const live = DB.items.filter(it => !it.end);
     out.push(h("div", { class: "card" }, h("h3", null, "루틴별 최근 4주"),
