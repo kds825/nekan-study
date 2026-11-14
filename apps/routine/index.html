@@ -141,6 +141,9 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .days7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .days7 .chip { min-width: 0; padding: 4px 0; border-radius: 6px; }
 .days7 .chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); border-color: var(--accent); font-weight: 700; }
+/* 그날 요일이 아니라 쉬는 루틴: 이름만 점선 표시로 */
+.rest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.resttag { font-size: .8rem; padding: 2px 9px; border-radius: 12px; border: 1px dashed var(--line); color: var(--muted); }
 .pack { border-top: 1px solid var(--line); padding-top: 10px; }   /* 추천 묶음 사이 구분선 */
 .pack > .bar { min-height: 40px; }   /* 모두 넣기 버튼이 없는 줄도 높이를 맞춘다 */
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
@@ -263,7 +266,7 @@ details[open] > summary::after { content: "접기 ▴"; }
     const t = today(), day = S.day && S.day <= t ? S.day : t;
     const due = dueOn(day), done = doneOn(day);
     const n = due.filter(it => done.has(it.id)).length;
-    const rest = DB.items.filter(it => !it.end && !scheduled(it, day) && day >= it.start).length;
+    const rest = DB.items.filter(it => !it.end && !scheduled(it, day) && day >= it.start);
     const toggle = it => {
       const s = doneOn(day); s.has(it.id) ? s.delete(it.id) : s.add(it.id);
       if (s.size) DB.done[day] = [...s]; else delete DB.done[day];
@@ -302,7 +305,8 @@ details[open] > summary::after { content: "접기 ▴"; }
             h("span", { class: "box" }), h("span", { class: "label" }, h("span", { class: "nm" }, it.name), it.note ? h("span", { class: "detail" }, it.note) : null)); b.querySelector(".box").innerHTML = tick; return b; })));
       }
     }
-    if (rest) out.push(h("p", { class: "muted small" }, `이날 요일이 아니어서 빠진 루틴 ${rest}개`));
+    if (rest.length) out.push(h("div", { class: "rest" }, h("span", { class: "small muted" }, `${DOW[dowOf(day)]}요일은 쉬는 루틴`),
+      rest.map(it => h("span", { class: "resttag" }, it.name))));
     out.push(h("div", { class: "card" }, h("label", { class: "small muted", for: "memo" }, "하루 한 줄 메모 (선택)"),
       h("textarea", { id: "memo", placeholder: "오늘 어땠나요?", value: DB.memo[day] || "",
         onchange: e => { const v = e.target.value.trim(); if (v) DB.memo[day] = v; else delete DB.memo[day]; save(); } })));
