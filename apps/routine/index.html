@@ -75,7 +75,11 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .hero .big { font: 400 3.2rem/1 var(--display); color: var(--accent); }
 .hero .of { font: 400 1.4rem/1 var(--display); color: var(--muted); }
 .hero .pct { margin-left: auto; font: 500 .95rem var(--mono); color: var(--muted); }
-.slot { font: 500 .8rem var(--mono); color: var(--muted); letter-spacing: .04em; margin-top: 4px; }
+/* 시간대 제목: 이름 · 한 개수 · 가는 선. 다 하면 숫자를 강조색으로 */
+.slot { display: flex; align-items: center; gap: 8px; font: 400 1.15rem var(--display); margin-top: 6px; }
+.slot::after { content: ""; flex: 1; height: 1px; background: var(--line); order: 1; }
+.slot .cnt { order: 2; font: 500 .8rem var(--mono); color: var(--muted); }
+.slot.all .cnt { color: var(--accent); }
 .check { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 56px; text-align: left; padding: 10px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; color: inherit; font: 500 1.02rem var(--body); cursor: pointer; }
 .check .box { width: 28px; height: 28px; flex: none; border-radius: 7px; border: 2px solid var(--accent); display: grid; place-items: center; }
 .check .box svg { width: 18px; height: 18px; opacity: 0; }
@@ -277,7 +281,8 @@ details[open] > summary::after { content: "접기 ▴"; }
       for (const [k, label] of SLOTS) {
         const list = due.filter(it => it.slot === k);
         if (!list.length) continue;
-        out.push(h("div", { class: "stack" }, h("p", { class: "slot" }, label),
+        const dn = list.filter(it => done.has(it.id)).length;
+        out.push(h("div", { class: "stack" }, h("h2", { class: "slot" + (dn === list.length ? " all" : "") }, h("span", null, label), h("span", { class: "cnt" }, `${dn}/${list.length}`)),
           list.map(it => { const b = h("button", { class: "check", "aria-pressed": String(done.has(it.id)), onclick: () => toggle(it) },
             h("span", { class: "box" }), h("span", { class: "label" }, h("span", { class: "nm" }, it.name), it.note ? h("span", { class: "detail" }, it.note) : null)); b.querySelector(".box").innerHTML = tick; return b; })));
       }
