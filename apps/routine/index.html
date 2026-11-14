@@ -142,6 +142,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .days7 .chip { min-width: 0; padding: 4px 0; border-radius: 6px; }
 .days7 .chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); border-color: var(--accent); font-weight: 700; }
 .pack { border-top: 1px solid var(--line); padding-top: 10px; }   /* 추천 묶음 사이 구분선 */
+.pack > .bar { min-height: 40px; }   /* 모두 넣기 버튼이 없는 줄도 높이를 맞춘다 */
 details.card:not([open]) { gap: 0; }   /* 접혔을 때 아래에 빈 간격이 남지 않게 */
 details > summary { cursor: pointer; font-weight: 500; min-height: 32px; display: flex; align-items: center; justify-content: space-between; list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
@@ -401,7 +402,7 @@ details[open] > summary::after { content: "접기 ▴"; }
         if (!left.length) return null;
         return h("div", { class: "stack pack", style: "gap:6px" },
           h("div", { class: "bar" }, h("strong", { class: "small" }, p.name),
-            h("button", { class: "back small", onclick: () => { left.forEach(s => addItem(...s)); render(); } }, `${left.length}개 모두 넣기`)),
+            left.length > 1 ? h("button", { class: "back small", onclick: () => { left.forEach(s => addItem(...s)); render(); } }, `모두 넣기 (${left.length})`) : null),
           h("div", { class: "chips" }, left.map(s => h("button", { class: "chip", onclick: () => { addItem(...s); render(); } },
             "+ " + s[0] + (s[2].length < 7 ? ` (${daysLabel(s[2])})` : "")))));
       })));
