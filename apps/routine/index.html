@@ -144,6 +144,13 @@ button:focus-visible, a:focus-visible, label.btn:focus-visible, summary:focus-vi
 .rlist > .item { gap: 2px; }
 .rlist > .item .who { margin-right: 6px; }
 .rlist .icon-btn:hover:not([disabled]) { background: var(--bg); border-color: var(--line); }
+.icon-btn.del { color: var(--bad); min-width: 44px; }
+.rlist .icon-btn.del:hover { background: var(--bad-bg); border-color: var(--bad); }
+/* 지운 뒤 잠깐 뜨는 되돌리기 막대. 확인 창 대신 한 번에 지우고 실수는 여기서 되돌린다. */
+.snack { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 9; display: flex; gap: 12px; align-items: center;
+  max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border-radius: 8px; background: var(--fg); color: var(--bg); box-shadow: 0 4px 16px rgba(0, 0, 0, .28); font-size: .92rem; }
+.snack span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snack button { flex: none; min-height: 40px; padding: 4px 14px; border-radius: 6px; border: 1.5px solid var(--bg); background: transparent; color: var(--bg); font: 700 .92rem var(--body); cursor: pointer; }
 .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .slottag { font: 500 .72rem/1.6 var(--mono); padding: 0 7px; border-radius: 4px; border: 1px solid var(--accent); color: var(--accent); }
 /* 매일·평일·주말: 아래 요일 칸과 같은 네모 모양으로 작게 */
@@ -206,7 +213,7 @@ details[open] > summary::after { content: "접기 ▴"; }
       ["12시 전에 눕기", "pm", ALL, "누운 뒤에는 휴대폰 보지 않기"]] }];
   const SUGGEST = PACKS.flatMap(p => p.items);
   let DB = { version: 1, items: [], done: {}, memo: {} };
-  const S = { route: "today", day: null, draft: { name: "", slot: "any", days: ALL.slice() }, edit: null, msg: "", pick: new Set() };
+  const S = { route: "today", day: null, draft: { name: "", slot: "any", days: ALL.slice() }, edit: null, msg: "", pick: new Set(), undo: null };
 
   /* ---------- 작은 유틸 ---------- */
   function h(tag, props, ...kids) {
@@ -404,10 +411,27 @@ details[open] > summary::after { content: "접기 ▴"; }
     return h("div", { class: "chips", role: "group", "aria-label": "때" }, SLOTS.map(([k, l]) =>
       h("button", { type: "button", class: "chip", "aria-pressed": String(target.slot === k), onclick: () => { target.slot = k; render(); } }, l)));
   }
+  /* 한 번 눌러 지운다. 오늘 만든 루틴은 목록에서 빼고, 기록이 있는 루틴은 오늘부터 끝낸 것으로 두어 지난 기록을 남긴다.
+     실수로 눌렀을 때를 위해 몇 초 동안 '되돌리기'를 보여 준다. */
+  let undoTimer;
+  function removeItem(it) {
+    const index = DB.items.indexOf(it), removed = it.start >= today();
+    S.undo = { it, index, removed, prevEnd: it.end };
+    if (removed) DB.items = DB.items.filter(x => x !== it); else it.end = today();
+    if (S.edit && S.edit.id === it.id) S.edit = null;
+    save(); render();
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => { S.undo = null; render(); }, 6000);
+  }
+  function undoRemove() {
+    const u = S.undo; if (!u) return;
+    if (u.removed) DB.items.splice(Math.min(u.index, DB.items.length), 0, u.it); else if (u.prevEnd) u.it.end = u.prevEnd; else delete u.it.end;
+    S.undo = null; clearTimeout(undoTimer); save(); render();
+  }
   function viewManage() {
     const d = S.draft;
     const live = DB.items.filter(it => !it.end);
-    const out = [header("루틴", "루틴을 넣고 고칩니다. 지워도 지난 기록은 남아요.")];
+    const out = [header("루틴", "✕를 누르면 바로 지워지고, 잠깐 '되돌리기'가 떠요. 지워도 지난 기록은 남아요.")];
     out.push(h("form", { class: "card", onsubmit: e => {
       e.preventDefault(); if (!d.name.trim()) return;
       addItem(d.name, d.slot, d.days, d.note || ""); S.draft = { name: "", note: "", slot: d.slot, days: d.days }; render();
@@ -452,19 +476,17 @@ details[open] > summary::after { content: "접기 ▴"; }
           h("p", { class: "small muted" }, "무슨 요일에 하나요?"), daysPicker(e),
           h("div", { class: "row" }, h("button", { class: "btn", type: "submit" }, "저장"),
             h("button", { class: "btn ghost", type: "button", onclick: () => { S.edit = null; render(); } }, "취소"),
-            h("button", { class: "btn danger", type: "button", onclick: () => {
-              if (!confirm(`'${it.name}'을(를) 지울까요? 오늘부터 목록에서 빠지고, 지난 기록은 달력에 남습니다.`)) return;
-              if (it.start >= today()) DB.items = DB.items.filter(x => x !== it); else it.end = today();
-              S.edit = null; save(); render();
-            } }, "지우기")));
+            h("button", { class: "btn danger", type: "button", onclick: () => removeItem(it) }, "지우기")));
       }
       return h("div", { class: "item" },
         h("div", { class: "who" }, h("strong", null, it.name), h("div", { class: "small muted meta" }, h("span", { class: "slottag" }, SLOTS.find(s => s[0] === it.slot)[1]), daysLabel(it.days)),
           it.note ? h("div", { class: "small muted" }, it.note) : null),
         h("button", { class: "icon-btn", "aria-label": "위로", disabled: k === 0, onclick: () => move(it, -1) }, "↑"),
         h("button", { class: "icon-btn", "aria-label": "아래로", disabled: k === live.length - 1, onclick: () => move(it, 1) }, "↓"),
-        h("button", { class: "icon-btn", "aria-label": "고치기", onclick: () => { S.edit = { id: it.id, name: it.name, note: it.note || "", slot: it.slot, days: it.days.slice() }; render(); } }, "✎"));
+        h("button", { class: "icon-btn", "aria-label": "고치기", onclick: () => { S.edit = { id: it.id, name: it.name, note: it.note || "", slot: it.slot, days: it.days.slice() }; render(); } }, "✎"),
+        h("button", { class: "icon-btn del", "aria-label": `${it.name} 지우기`, title: "지우기", onclick: () => removeItem(it) }, "✕"));
     })));
+    if (S.undo) out.push(h("div", { class: "snack", role: "status" }, h("span", null, `'${S.undo.it.name}' 지움`), h("button", { onclick: undoRemove }, "되돌리기")));
     out.push(h("div", { class: "card" }, h("h3", null, "백업과 지우기"),
       h("p", { class: "small" }, "루틴과 체크 기록은 이 브라우저에만 있습니다. 다른 기기로 옮기거나 브라우저 데이터를 지우기 전에 백업 파일로 저장하세요."),
       h("div", { class: "row" },
