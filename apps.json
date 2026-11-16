@@ -32,6 +32,15 @@
       "addedAt": "2026-11-15"
     },
     {
+      "id": "writing",
+      "name": "매일 글쓰기",
+      "description": "주제를 보내 두면 매일 아침 8시 전에 내 문체로 쓴 글 초안이 옵니다. 여러 에이전트가 쓰고 검증합니다.",
+      "path": "apps/writing/",
+      "icon": "pen",
+      "status": "live",
+      "addedAt": "2026-11-17"
+    },
+    {
       "id": "meeting-english",
       "name": "회의 영어",
       "description": "회의 영어를 읽고, 듣고, 말하는 하루 10분 학습. 출퇴근 운전 중 듣기와 단어 복습도 있습니다.",

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>매일 글쓰기</title>
+<meta name="description" content="주제를 보내면 매일 아침 8시 전에 글 초안 한 편을 받는 앱.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10191b" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%230d6b66'/%3E%3Cpath d='M10 22l1-4 9-9 3 3-9 9z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 글을 쓰는 일은 비공개 저장소 kds825/daily-writer의 GitHub Actions가 Claude 구독으로 한다.
+   이 페이지는 공개 사이트라 초안·문체 샘플을 두지 않고, 주제를 그 저장소의 Issue로 보내는 화면과 링크만 둔다.
+   보낸 주제 목록과 설정 체크는 이 브라우저의 localStorage('writing-' 키)에만 둔다. */
+:root {
+  color-scheme: light dark;
+  --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
+  --accent: #0d6b66; --accent-ink: #ffffff; --mark: #ffe45c;
+  --good: #17693f; --good-bg: #e2f4e9; --bad: #a93127; --bad-bg: #fbe9e6;
+  --display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #10191b; --grid: #162225; --fg: #e6eeec; --muted: #9db0ae; --surface: #18262a; --line: #2f4346;
+  --accent: #4fc4ba; --accent-ink: #08201f; --mark: #5c5000;
+  --good: #6ad698; --good-bg: #12301f; --bad: #ff9c8f; --bad-bg: #3a1a16;
+} }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background-color: var(--bg); color: var(--fg); font: 400 16px/1.65 var(--body); word-break: keep-all; overflow-wrap: anywhere;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#app { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.25; margin: 0; }
+h1 { font-size: 1.85rem; } h2 { font-size: 1.3rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+code { font: 500 .85rem var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
+.muted { color: var(--muted); } .small { font-size: .88rem; }
+.head { display: flex; flex-direction: column; gap: 2px; }
+.back { display: inline-flex; align-items: center; min-height: 44px; align-self: flex-start; margin: -6px 0 -6px -8px; padding: 0 12px 0 8px; border-radius: 6px; color: var(--accent); text-decoration: none; font-weight: 500; font-size: .92rem; }
+.card { padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
+label.field { display: flex; flex-direction: column; gap: 4px; font-weight: 500; font-size: .92rem; }
+label.field .opt { font-weight: 400; color: var(--muted); }
+input, textarea { width: 100%; font: inherit; font-weight: 400; color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; min-height: 44px; }
+textarea { min-height: 76px; resize: vertical; }
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn { min-height: 44px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font: 700 .95rem var(--body); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn[disabled] { cursor: default; background: transparent; color: var(--muted); border-color: var(--line); border-style: dashed; }
+.btns { display: grid; gap: 8px; }
+.note { padding: 10px 14px; border-radius: 6px; border: 1.5px solid var(--line); font-size: .9rem; }
+.note.good { background: var(--good-bg); color: var(--good); border-color: var(--good); }
+.note.bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+/* 링크 목록: 카드 하나 안에 구분선으로 나눈 줄 */
+.links { display: flex; flex-direction: column; margin: 0 -16px -14px; }
+.links a { display: flex; flex-direction: column; padding: 11px 16px; border-top: 1px solid var(--line); text-decoration: none; color: var(--fg); }
+.links a b { color: var(--accent); font-weight: 500; }
+.links a span { font-size: .84rem; color: var(--muted); }
+.links a:hover { background: var(--bg); }
+.sent li { list-style: none; padding: 9px 16px; border-top: 1px solid var(--line); }
+.sent time { display: block; font: 500 .76rem var(--mono); color: var(--accent); }
+.sent .ang { font-size: .84rem; color: var(--muted); }
+ul.sent { display: flex; flex-direction: column; padding: 0; margin: 0 -16px -14px; }
+/* 처음 설정: 단계마다 "했어요" 체크 */
+.steps { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; counter-reset: s; }
+.steps li { list-style: none; display: grid; grid-template-columns: 30px 1fr; gap: 10px; }
+.steps li::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); display: grid; place-items: center; font: 500 .85rem var(--mono); }
+.steps li.done::before { content: "✓"; background: var(--accent); color: var(--accent-ink); }
+.steps .body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.steps .done .t { color: var(--muted); }
+.tick { align-self: flex-start; min-height: 40px; padding: 4px 12px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font: 500 .85rem var(--body); cursor: pointer; }
+.tick[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+details > summary { cursor: pointer; font: 400 1.2rem var(--display); min-height: 32px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::after { content: "펼치기"; font: 500 .8rem var(--body); color: var(--accent); }
+details[open] > summary::after { content: "접기"; }
+details[open] > summary { margin-bottom: 10px; }
+.flow { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; font-size: .92rem; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+(() => {
+  "use strict";
+  const REPO = "kds825/daily-writer";            // 비공개 저장소. 초안·필자 프로필·문체 샘플은 거기에만 둔다
+  const GH = "https://github.com/" + REPO;
+  const LABEL = "주제";
+  const KEY = "writing-data-v1";
+  const SETUP = [
+    { id: "token", t: "Claude 구독 연결", body: () => [
+      p("PC 터미널에서 아래 두 줄을 차례로 실행합니다. 첫 줄은 브라우저로 Claude에 로그인하고 긴 토큰을 보여 주고, 둘째 줄이 그 토큰을 붙여 넣으라고 묻습니다. API 키·추가 요금 없이 구독으로 돕니다."),
+      h("code", null, "claude setup-token"), h("code", null, "gh secret set CLAUDE_CODE_OAUTH_TOKEN -R " + REPO),
+      p("이게 없으면 매일 \"초안 생성 실패\" 알림만 옵니다.", "small muted")] },
+    { id: "author", t: "필자 프로필 쓰기", body: () => [
+      p("이력, 관심 주제, 독자, 말투, 자주 쓰는·안 쓰는 표현, 내 입장을 적습니다. 문체를 맞추는 데 가장 큰 영향을 줍니다."),
+      a(GH + "/edit/main/config/author.md", "author.md 고치러 가기")] },
+    { id: "samples", t: "내가 쓴 글 3~5편 올리기", body: () => [
+      p("블로그에 올렸던 글을 .md나 .txt로 올립니다. 작가와 검수 에이전트가 문장 길이, 어미, 비유 습관을 이 글에 맞춥니다. 게시한 글을 계속 더하면 점점 내 글에 가까워집니다."),
+      a(GH + "/upload/main/config/style-samples", "style-samples에 올리러 가기")] },
+  ];
+
+  const load = () => {
+    try {
+      const d = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (d && d.version === 1) return { version: 1, sent: Array.isArray(d.sent) ? d.sent : [], setup: d.setup || {} };
+    } catch {}
+    return { version: 1, sent: [], setup: {} };
+  };
+  let DB = load(), msg = null;
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); publishSummary(); } catch {}
+  }
+  function publishSummary() {
+    const left = SETUP.filter(s => !DB.setup[s.id]).length;
+    const text = left ? `처음 설정 ${SETUP.length - left}/${SETUP.length}` : `보낸 주제 ${DB.sent.length}개`;
+    try { localStorage.setItem("platform-summary:writing", JSON.stringify({ text, at: Date.now() })); } catch {}
+  }
+
+  function h(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const k of kids.flat(Infinity)) if (k != null && k !== false) e.append(k);
+    return e;
+  }
+  const p = (t, cls) => h("p", cls ? { class: cls } : null, t);
+  const a = (href, t) => h("a", { href, target: "_blank", rel: "noopener" }, t + " ↗");
+  const fmt = ms => { const d = new Date(ms); return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
+  function send() {
+    const title = document.getElementById("topic").value.trim();
+    const angle = document.getElementById("angle").value.trim();
+    if (!title) { msg = { bad: true, t: "주제를 한 줄 적어 주세요." }; return render(); }
+    const url = `${GH}/issues/new?labels=${encodeURIComponent(LABEL)}&title=${encodeURIComponent(title)}&body=${encodeURIComponent(angle)}`;
+    window.open(url, "_blank", "noopener");
+    DB.sent.unshift({ title: title.slice(0, 200), angle: angle.slice(0, 500), at: Date.now() });
+    DB.sent = DB.sent.slice(0, 30);
+    save();
+    document.getElementById("topic").value = ""; document.getElementById("angle").value = "";
+    msg = { t: "GitHub 새 이슈 화면을 열었습니다. 거기서 'Create'(제출)를 눌러야 접수됩니다." };
+    render();
+  }
+
+  function setupCard(left) {
+    return h("details", { class: "card", id: "setup", open: left > 0 },
+      h("summary", null, left ? `처음 한 번 설정 (${SETUP.length - left}/${SETUP.length})` : "처음 설정 (끝)"),
+      h("ol", { class: "steps" }, SETUP.map(s => h("li", { class: DB.setup[s.id] ? "done" : null },
+        h("div", { class: "body" }, h("b", { class: "t" }, s.t), s.body(),
+          h("button", { class: "tick", "aria-pressed": String(!!DB.setup[s.id]),
+            onclick: () => { DB.setup[s.id] = !DB.setup[s.id]; save(); render(); } }, DB.setup[s.id] ? "✓ 했어요" : "했어요"))))));
+  }
+
+  function render() {
+    const left = SETUP.filter(s => !DB.setup[s.id]).length;
+    const keep = id => document.getElementById(id)?.value ?? "";
+    const topicV = keep("topic"), angleV = keep("angle");
+    const app = document.getElementById("app");
+    app.replaceChildren(...[
+      h("header", { class: "head" },
+        h("a", { class: "back", href: "../../" }, "← 공부방"),
+        h("h1", null, "매일 글쓰기"),
+        p("매일 아침 8시 전에 글 초안 한 편이 옵니다. 주제를 보내 두면 그 주제로 씁니다.", "muted")),
+
+      left ? setupCard(left) : null,
+
+      h("section", { class: "card" },
+        h("h2", null, "쓸 주제 보내기"),
+        h("label", { class: "field" }, "주제",
+          h("input", { id: "topic", maxlength: "200", placeholder: "예: 회의록을 AI에 맡기고 달라진 것", enterkeyhint: "next" })),
+        h("label", { class: "field" }, h("span", null, "원하는 방향 ", h("span", { class: "opt" }, "(선택)")),
+          h("textarea", { id: "angle", maxlength: "500", placeholder: "예: 직장 3년 차 독자에게. 시간이 준 것보다 생각하는 방식이 바뀐 점을 중심으로." })),
+        msg ? h("div", { class: "note" + (msg.bad ? " bad" : " good"), role: "status" }, msg.t) : null,
+        h("div", { class: "btns" },
+          h("button", { class: "btn", onclick: send }, "주제 보내기"),
+          h("a", { class: "btn ghost", href: GH + "/actions/workflows/daily.yml", target: "_blank", rel: "noopener" }, "지금 바로 쓰기 ↗")),
+        p("보낸 주제는 다음 날 아침 초안에 쓰고, 여러 개면 보낸 순서대로 하루 하나씩 씁니다. 지금 바로 받고 싶으면 주제를 보낸 뒤 '지금 바로 쓰기'에서 Run workflow를 누르세요(주제 칸은 비워 둠). 30분쯤 걸립니다.", "small muted")),
+
+      h("section", { class: "card" },
+        h("h2", null, "초안 보기"),
+        p("초안은 비공개 저장소에만 있어 GitHub에 로그인한 기기에서 보입니다. 다 되면 GitHub 알림으로도 옵니다.", "small muted"),
+        h("nav", { class: "links" },
+          h("a", { href: GH + "/issues?q=" + encodeURIComponent('is:issue in:title "오늘의 초안"'), target: "_blank", rel: "noopener" },
+            h("b", null, "오늘의 초안 알림 ↗"), h("span", null, "제목 후보, 합격 여부, 내가 채울 자리")),
+          h("a", { href: GH + "/tree/main/drafts", target: "_blank", rel: "noopener" },
+            h("b", null, "초안 폴더 ↗"), h("span", null, "날짜별 본문(post.md·Word), 검수 리포트, 출처 확인표")),
+          h("a", { href: GH + "/issues?q=" + encodeURIComponent(`is:open label:${LABEL}`), target: "_blank", rel: "noopener" },
+            h("b", null, "기다리는 주제 ↗"), h("span", null, "아직 쓰지 않은 주제. 닫으면 취소됩니다")))),
+
+      DB.sent.length ? h("section", { class: "card" },
+        h("h2", null, "이 기기에서 보낸 주제"),
+        h("ul", { class: "sent" }, DB.sent.slice(0, 10).map(s =>
+          h("li", null, h("time", null, fmt(s.at)), s.title, s.angle ? h("div", { class: "ang" }, s.angle) : null)))) : null,
+
+      h("details", { class: "card" },
+        h("summary", null, "어떻게 쓰나요"),
+        h("ol", { class: "flow" },
+          h("li", null, "기획자가 주제와 내 프로필로 글의 방향을 잡습니다."),
+          h("li", null, "리서처가 자료를 찾고, 링크가 열리는지와 인용이 원문과 같은지 코드로 확인합니다."),
+          h("li", null, "작가가 내 문체 샘플에 맞춰 씁니다. 내 경험은 지어내지 않고 [경험 넣기] 자리로 비워 둡니다."),
+          h("li", null, "AI 말투 검사기(규칙)와 팩트체크 에이전트가 먼저 거르고, 걸리면 바로 고칩니다."),
+          h("li", null, "성격이 다른 검수자 5명이 따로 점수를 매기고 서로 반박합니다. 사람다움 점수가 낮으면 불합격입니다."),
+          h("li", null, "편집장이 고칠 점을 정리하고, 불합격이면 최대 두 번 다시 씁니다.")),
+        p("에이전트는 한 편에 최소 9종, 15번 이상 돕니다. 합격 판정은 모델이 아니라 코드가 합니다. 그래도 통과하지 못하면 '보류 초안'으로 이유와 함께 옵니다.", "small muted")),
+
+      left ? null : setupCard(0)].filter(Boolean));
+    const t = document.getElementById("topic"), g = document.getElementById("angle");
+    t.value = topicV; g.value = angleV;
+  }
+
+  publishSummary();
+  render();
+})();
+</script>
+</body>
+</html>
