@@ -49,6 +49,15 @@
       "icon": "talk",
       "status": "live",
       "addedAt": "2026-11-15"
+    },
+    {
+      "id": "plates",
+      "name": "차량번호 메모",
+      "description": "자주 마주치는 분들의 차량번호를 적어 두고, 번호 뒤 네 자리나 이름으로 바로 찾습니다.",
+      "path": "apps/plates/",
+      "icon": "car",
+      "status": "live",
+      "addedAt": "2026-11-17"
     }
   ]
 }

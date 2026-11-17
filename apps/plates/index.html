@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>차량번호 메모</title>
+<meta name="description" content="자주 마주치는 분들의 차량번호를 적어 두고, 번호 몇 자리나 이름으로 바로 찾는 메모장.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10191b" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='9' width='28' height='14' rx='3' fill='none' stroke='%230d6b66' stroke-width='2.5'/%3E%3Cpath d='M8 16h4M15 16h9' stroke='%230d6b66' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 공부방과 같은 모눈종이 바탕. 열자마자 검색창, 그 아래 번호판 모양 카드를 쌓는다.
+   차량번호와 이름은 이 브라우저의 localStorage('plates-' 키)에만 두며 서버나 저장소로 보내지 않는다. */
+:root {
+  color-scheme: light dark;
+  --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
+  --accent: #0d6b66; --accent-ink: #ffffff; --mark: #ffe45c; --mark-fg: #16282b;
+  --good: #17693f; --good-bg: #e2f4e9; --bad: #a93127; --bad-bg: #fbe9e6;
+  --plate-bg: #ffffff; --plate-fg: #111111; --plate-line: #222222;
+  --display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #10191b; --grid: #162225; --fg: #e6eeec; --muted: #9db0ae; --surface: #18262a; --line: #2f4346;
+  --accent: #4fc4ba; --accent-ink: #08201f; --mark: #5c5000; --mark-fg: #fff4b0;
+  --good: #6ad698; --good-bg: #12301f; --bad: #ff9c8f; --bad-bg: #3a1a16;
+  --plate-bg: #f4f4f0; --plate-fg: #111111; --plate-line: #f4f4f0;
+} }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background-color: var(--bg); color: var(--fg); font: 400 16px/1.6 var(--body); word-break: keep-all; overflow-wrap: anywhere;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#app { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 14px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.25; margin: 0; }
+h1 { font-size: 1.85rem; } h2 { font-size: 1.3rem; } h3 { font-size: 1.1rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+.muted { color: var(--muted); } .small { font-size: .88rem; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.head { display: flex; flex-direction: column; gap: 2px; }
+.back { display: inline-flex; align-items: center; min-height: 44px; align-self: flex-start; margin: -6px 0 -6px -8px; padding: 0 12px 0 8px; border-radius: 6px; color: var(--accent); text-decoration: none; font-weight: 500; font-size: .92rem; background: none; border: 0; font-family: inherit; cursor: pointer; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; position: sticky; top: 6px; z-index: 3; padding: 4px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; }
+.tabs button { min-height: 40px; border-radius: 7px; border: 0; background: transparent; color: var(--muted); font: 400 1.05rem var(--display); cursor: pointer; }
+.tabs button[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.card { padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
+input, textarea { width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; min-height: 44px; }
+textarea { min-height: 72px; resize: vertical; }
+input:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+label { font-size: .88rem; color: var(--muted); }
+.search { font-size: 1.35rem; min-height: 56px; padding: 10px 14px; border-width: 2px; border-color: var(--accent); background: var(--surface); }
+.btn { min-height: 44px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font: 700 .95rem var(--body); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+.btn[disabled] { cursor: default; background: transparent; color: var(--muted); border-color: var(--line); border-style: dashed; }
+.note { padding: 10px 14px; border-radius: 6px; border: 1.5px solid var(--line); font-size: .9rem; }
+.note.good { background: var(--good-bg); color: var(--good); border-color: var(--good); }
+.note.bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+/* 번호판 모양: 흰 바탕, 검은 테두리, 숫자를 크게 */
+.plate { display: inline-flex; align-items: baseline; gap: .35em; padding: 4px 12px; border: 2.5px solid var(--plate-line); outline: 1.5px solid #222; border-radius: 6px; background: var(--plate-bg); color: var(--plate-fg); font: 700 1.55rem/1.2 var(--body); letter-spacing: .02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plate .tail { font-size: 1.15em; }
+.plate mark, .who mark { background: var(--mark); color: var(--mark-fg); border-radius: 2px; padding: 0 1px; }
+.hit { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; }
+.hit.one { border-color: var(--accent); border-width: 2px; }
+.hit.one .plate { font-size: 2.1rem; }
+.hit .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.who { font-size: 1.1rem; }
+.who strong { font-size: 1.2rem; }
+.meta { font-size: .9rem; color: var(--muted); }
+.memo { font-size: .9rem; white-space: pre-wrap; padding-left: 10px; border-left: 3px solid var(--line); }
+.icon-btn { min-width: 44px; min-height: 44px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--accent); font: 700 1rem var(--body); cursor: pointer; }
+.icon-btn.star[aria-pressed="true"] { color: #c98a00; border-color: #c98a00; }
+.icon-btn.del { color: var(--bad); }
+.count { font: 500 .85rem var(--mono); color: var(--muted); }
+.snack { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 9; display: flex; gap: 12px; align-items: center;
+  max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border-radius: 8px; background: var(--fg); color: var(--bg); box-shadow: 0 4px 16px rgba(0, 0, 0, .28); font-size: .92rem; }
+.snack span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snack button { flex: none; min-height: 40px; padding: 4px 14px; border-radius: 6px; border: 1.5px solid var(--bg); background: transparent; color: var(--bg); font: 700 .92rem var(--body); cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+  /* 이 앱은 'plates-'로 시작하는 키와 공부방 첫 화면용 요약 키만 쓴다. */
+  const KEY = "plates-data-v1";
+  const app = document.getElementById("app");
+  const S = { route: "find", q: "", edit: null, draft: null, msg: "", flash: "", undo: null };
+  let DB = { version: 1, cars: [] };
+
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "value") el.value = v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat(Infinity)) if (c !== null && c !== undefined && c !== false) el.append(c);
+    return el;
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  /* ---------- 번호 다루기 ----------
+     저장은 공백·하이픈을 뺀 모양("12가3456", "서울12가3456"), 화면에는 뒤 네 자리 앞에 띄어 쓴다("12가 3456"). */
+  const normPlate = s => String(s || "").replace(/[\s\-·.]/g, "").toUpperCase();
+  const PLATE_RE = /^([가-힣]{2})?\d{2,3}[가-힣]\d{4}$/;
+  const digits = s => String(s || "").replace(/\D/g, "");
+  const norm = s => String(s || "").toLowerCase().replace(/[\s\-·.,()]/g, "");
+  function plateEl(p, q) {
+    const m = /^(.*?)(\d{4})$/.exec(p);
+    const head = m ? m[1] : p, tail = m ? m[2] : "";
+    return h("span", { class: "plate", "aria-label": `차량번호 ${p}` }, hl(head, q, true), tail ? h("span", { class: "tail" }, hl(tail, q, true)) : null);
+  }
+  /* 찾는 글자를 형광펜으로 칠한다. 번호는 숫자만 맞춰 칠한다. */
+  function hl(text, q, plate) {
+    const t = String(text || ""), key = plate ? digits(q) || normPlate(q) : String(q || "").trim();
+    if (!key || key.length < 1) return t;
+    const hay = plate ? t.toUpperCase() : t.toLowerCase();
+    const i = plate && /^\d{4}$/.test(key) && hay.endsWith(key) ? hay.length - 4 : hay.indexOf(plate ? key : key.toLowerCase());
+    if (i < 0) return t;
+    return [t.slice(0, i), h("mark", null, t.slice(i, i + key.length)), t.slice(i + key.length)];
+  }
+
+  function load() {
+    try { const d = JSON.parse(localStorage.getItem(KEY) || "null"); if (d && Array.isArray(d.cars)) DB = d; } catch { /* 비어 있으면 새로 시작 */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); S.msg = ""; publishSummary(); return true; }
+    catch { S.msg = "이 브라우저에 저장하지 못했습니다. 시크릿 모드라면 일반 창에서 열어 주세요."; return false; }
+  }
+  /* 공부방 첫 화면에는 등록 대수만 넘긴다. 번호·이름은 넘기지 않는다. */
+  function publishSummary() {
+    try { localStorage.setItem("platform-summary:plates", JSON.stringify({ text: DB.cars.length ? `차량 ${DB.cars.length}대 등록` : "아직 등록한 차량이 없습니다", at: new Date().toISOString() })); } catch { /* 요약은 없어도 된다 */ }
+  }
+
+  /* ---------- 라우팅 ---------- */
+  function parseHash() {
+    const r = location.hash.slice(1);
+    if (r.startsWith("e-")) return { route: "edit", edit: r.slice(2) };
+    if (r === "add" || r === "backup") return { route: r };
+    return { route: "find" };
+  }
+  function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else render(); }
+  window.addEventListener("hashchange", () => { Object.assign(S, parseHash(), { draft: null }); render(); window.scrollTo(0, 0); });
+
+  function header(title, sub) {
+    const tabs = [["find", "찾기"], ["add", "등록"], ["backup", "백업"]];
+    return [
+      h("header", { class: "head" }, h("a", { class: "back", href: "../../" }, "← 공부방"), h("h1", null, title), sub ? h("p", { class: "muted small" }, sub) : null),
+      h("nav", { class: "tabs", "aria-label": "차량번호 메모 메뉴" }, tabs.map(([r, l]) =>
+        h("button", { "aria-current": (S.route === r || (r === "add" && S.route === "edit")) ? "page" : null, onclick: () => go(r) }, l))),
+      S.msg ? h("div", { class: "note bad", role: "alert" }, S.msg) : null];
+  }
+
+  /* ---------- 찾기 ---------- */
+  function matches(c, q) {
+    const qq = q.trim(); if (!qq) return true;
+    const d = digits(qq), n = norm(qq);
+    // 숫자만 쳤으면 번호의 숫자에서 찾는다. 한글 앞 숫자와 뒤 네 자리는 따로 본다(123다4567이 '3456'에 걸리지 않게).
+    // 네 자리를 치면 뒤 네 자리와 정확히 맞는 번호만, 그보다 짧으면 앞 숫자나 뒤 네 자리 안에서 찾는다.
+    if (d && d.length === qq.replace(/\s/g, "").length) {
+      const p = normPlate(c.plate), m = /(\d{2,3})[가-힣](\d{4})$/.exec(p);
+      if (!m) return digits(p).includes(d);
+      const [, front, tail] = m;
+      if (d.length === 4) return tail === d || front === d;
+      if (d.length > 4) return (front + tail).includes(d);
+      return front.includes(d) || tail.includes(d);
+    }
+    return normPlate(c.plate).includes(normPlate(qq)) || norm([c.name, c.title, c.org, c.car, c.memo].join(" ")).includes(n);
+  }
+  function sorted(list) {
+    return list.slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || String(a.name).localeCompare(String(b.name), "ko"));
+  }
+  function hitCard(c, q, one) {
+    return h("article", { class: "hit" + (one ? " one" : "") },
+      h("div", { class: "top" }, plateEl(c.plate, q),
+        h("div", { class: "row" },
+          h("button", { class: "icon-btn star", "aria-pressed": String(!!c.pin), "aria-label": c.pin ? "자주 보는 분에서 빼기" : "자주 보는 분으로 위에 두기", title: "자주 보는 분", onclick: () => { c.pin = !c.pin; save(); refill(); } }, c.pin ? "★" : "☆"),
+          h("button", { class: "icon-btn", "aria-label": `${c.name || c.plate} 고치기`, title: "고치기", onclick: () => go("e-" + c.id) }, "✎"))),
+      h("div", { class: "who" }, h("strong", null, hl(c.name || "(이름 없음)", q)), c.title ? [" ", hl(c.title, q)] : null),
+      c.org || c.car ? h("div", { class: "meta" }, [c.org ? hl(c.org, q) : null, c.car ? hl(c.car, q) : null].filter(Boolean).flatMap((x, i) => i ? [" · ", x] : [x])) : null,
+      c.memo ? h("div", { class: "memo" }, hl(c.memo, q)) : null);
+  }
+  /* 글자를 칠 때마다 화면 전체를 다시 그리면 한글 조합이 끊기므로 결과 칸만 바꾼다. */
+  function results() {
+    const list = sorted(DB.cars.filter(c => matches(c, S.q)));
+    const q = S.q.trim();
+    return [
+      h("p", { class: "count", role: "status" }, q ? `${list.length}대 찾음` : `전체 ${DB.cars.length}대`),
+      list.length ? list.map(c => hitCard(c, q, q && list.length === 1)) :
+        h("div", { class: "note" }, q ? ["'", q, "'와 맞는 차량이 없습니다. ", h("button", { class: "back small", style: "display:inline;min-height:0;margin:0;padding:0", onclick: () => { S.draft = blank(q); go("add"); } }, "이 번호로 등록하기 →")] : "")];
+  }
+  function refill() { const box = document.getElementById("results"); if (box) box.replaceChildren(...[results()].flat(Infinity).filter(Boolean)); }
+  function viewFind() {
+    if (!DB.cars.length) return [header("차량번호 메모", "자주 마주치는 분들의 차량번호를 적어 두고 바로 찾습니다."),
+      h("div", { class: "card" }, h("h3", null, "첫 차량을 등록해 주세요"),
+        h("p", { class: "small" }, "번호, 이름, 직함, 소속, 차종을 적어 두면 번호 뒤 네 자리나 이름 일부만 쳐도 바로 찾을 수 있습니다. 적은 내용은 이 기기 브라우저에만 저장됩니다."),
+        h("button", { class: "btn", onclick: () => go("add") }, "차량 등록하기"))];
+    return [header("차량번호 메모"),
+      h("input", { id: "q", class: "search", type: "search", inputmode: "search", autocomplete: "off", enterkeyhint: "search", "aria-label": "번호 또는 이름으로 찾기",
+        placeholder: "번호 뒤 4자리 또는 이름", value: S.q, oninput: e => { S.q = e.target.value; refill(); } }),
+      h("div", { class: "stack", id: "results" }, results()),
+      h("p", { class: "muted small" }, "숫자만 치면 번호에서, 글자를 치면 이름·직함·소속·차종·메모에서 찾습니다. ★를 누르면 맨 위에 둡니다.")];
+  }
+
+  /* ---------- 등록·고치기 ---------- */
+  const blank = (plate = "") => ({ plate, name: "", title: "", org: "", car: "", memo: "", pin: false });
+  function viewForm() {
+    const editing = S.route === "edit" ? DB.cars.find(c => c.id === S.edit) : null;
+    if (S.route === "edit" && !editing) return [header("고치기"), h("p", { class: "muted" }, "이 차량을 찾을 수 없습니다.")];
+    S.draft ||= editing ? { ...editing } : blank();
+    const d = S.draft;
+    const field = (k, label, ph, extra = {}) => [h("label", { for: "f-" + k }, label),
+      h("input", { id: "f-" + k, value: d[k] || "", placeholder: ph, autocomplete: "off", oninput: e => { d[k] = e.target.value; }, ...extra })];
+    const submit = e => {
+      e.preventDefault();
+      const plate = normPlate(d.plate);
+      if (!plate) { S.flash = ""; S.msg = "차량번호를 적어 주세요."; render(); return; }
+      const dup = DB.cars.find(c => c.plate === plate && c !== editing);
+      if (dup && !confirm(`${plate}은(는) 이미 '${dup.name || "이름 없음"}'(으)로 등록돼 있습니다. 그래도 하나 더 저장할까요?`)) return;
+      if (!PLATE_RE.test(plate) && !confirm(`'${plate}'은(는) 흔한 번호 모양(예: 12가3456, 123가4567)과 다릅니다. 그대로 저장할까요?`)) return;
+      const entry = { plate, name: d.name.trim(), title: d.title.trim(), org: d.org.trim(), car: d.car.trim(), memo: d.memo.trim(), pin: !!d.pin };
+      if (editing) Object.assign(editing, entry, { updatedAt: today() });
+      else DB.cars.push({ id: uid(), createdAt: today(), ...entry });
+      if (!save()) { render(); return; }
+      S.draft = null; S.q = ""; S.flash = `${plate} 저장했습니다.`;
+      if (editing) go("find"); else { render(); document.getElementById("f-plate")?.focus(); }
+    };
+    return [header(editing ? "고치기" : "차량 등록", editing ? null : "번호만 적어도 저장됩니다. 나머지는 나중에 채워도 됩니다."),
+      S.flash ? h("div", { class: "note good", role: "status" }, S.flash) : null,
+      h("form", { class: "card", onsubmit: submit },
+        field("plate", "차량번호 (필수)", "예: 12가 3456, 서울12가3456", { required: true, enterkeyhint: "next" }),
+        field("name", "이름", "예: 김OO"),
+        field("title", "직함", "예: 대표이사, 상무"),
+        field("org", "소속", "예: 회사·부서"),
+        field("car", "차종·색", "예: 검정 제네시스 G90"),
+        h("label", { for: "f-memo" }, "메모"),
+        h("textarea", { id: "f-memo", value: d.memo || "", placeholder: "예: 정문 쪽 지정석, 기사님 동행", oninput: e => { d.memo = e.target.value; } }),
+        h("label", { class: "row", style: "color:var(--fg);font-size:.95rem" }, h("input", { type: "checkbox", style: "width:22px;min-height:22px", checked: d.pin ? true : null, onchange: e => { d.pin = e.target.checked; } }), "★ 자주 보는 분 (목록 맨 위에)"),
+        h("div", { class: "row" },
+          h("button", { class: "btn", type: "submit" }, editing ? "고친 내용 저장" : "저장"),
+          editing ? h("button", { class: "btn ghost", type: "button", onclick: () => go("find") }, "취소") : null,
+          editing ? h("button", { class: "btn danger", type: "button", onclick: () => removeCar(editing) }, "지우기") : null)),
+      !editing && DB.cars.length ? h("p", { class: "muted small" }, `지금 ${DB.cars.length}대 등록돼 있습니다. `, h("button", { class: "back small", style: "display:inline;min-height:0;margin:0;padding:0", onclick: () => go("find") }, "찾기로 →")) : null];
+  }
+
+  /* 한 번 눌러 지우고, 몇 초 동안 되돌릴 수 있게 한다. */
+  let undoTimer;
+  function removeCar(c) {
+    const index = DB.cars.indexOf(c);
+    DB.cars = DB.cars.filter(x => x !== c); save();
+    S.undo = { c, index }; S.draft = null;
+    go("find");
+    clearTimeout(undoTimer); undoTimer = setTimeout(() => { S.undo = null; render(); }, 6000);
+  }
+  function undoRemove() {
+    const u = S.undo; if (!u) return;
+    DB.cars.splice(Math.min(u.index, DB.cars.length), 0, u.c); S.undo = null; clearTimeout(undoTimer); save(); render();
+  }
+
+  /* ---------- 백업 ---------- */
+  function viewBackup() {
+    return [header("백업", "적은 차량번호는 이 기기 브라우저에만 있습니다. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 백업 파일로 저장하세요."),
+      S.flash ? h("div", { class: "note good", role: "status" }, S.flash) : null,
+      h("div", { class: "card" },
+        h("p", { class: "small" }, "백업 파일에는 이름과 차량번호가 들어 있으니 안전한 곳에 두세요."),
+        h("div", { class: "row" },
+          h("button", { class: "btn ghost", disabled: !DB.cars.length, onclick: () => {
+            const url = URL.createObjectURL(new Blob([JSON.stringify({ app: "plates", ...DB, exportedAt: new Date().toISOString() }, null, 1)], { type: "application/json" }));
+            const a = h("a", { href: url, download: `plates-백업-${today()}.json` }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+          } }, "백업 파일 저장"),
+          h("label", { class: "btn ghost", for: "restore", style: "color:var(--accent)" }, "백업 불러오기"),
+          h("input", { id: "restore", type: "file", accept: ".json,application/json", hidden: true, onchange: async e => {
+            try {
+              const d = JSON.parse(await e.target.files[0].text());
+              if (d.app !== "plates" || !Array.isArray(d.cars)) throw 0;
+              if (DB.cars.length && !confirm("지금 목록을 백업 파일 내용으로 바꿀까요?")) return;
+              DB = { version: 1, cars: d.cars }; save(); S.msg = ""; S.flash = `백업에서 ${d.cars.length}대를 불러왔습니다.`; render();
+            } catch { S.flash = ""; S.msg = "차량번호 메모 백업 파일이 아닙니다."; render(); }
+          } })),
+        h("div", { class: "bar", style: "border-top:1px solid var(--line);padding-top:10px" }, h("span", { class: "small muted" }, "처음부터 다시 하려면"),
+          h("button", { class: "btn danger", disabled: !DB.cars.length, onclick: () => {
+            if (!confirm("등록한 차량번호를 모두 지울까요? 되돌릴 수 없습니다.")) return;
+            DB = { version: 1, cars: [] }; try { localStorage.removeItem(KEY); } catch { /* 없으면 그만 */ } publishSummary(); S.flash = "모두 지웠습니다."; render();
+          } }, "모두 지우기")))];
+  }
+
+  function render() {
+    const view = S.route === "add" || S.route === "edit" ? viewForm() : S.route === "backup" ? viewBackup() : viewFind();
+    const out = [view].flat(Infinity).filter(Boolean);
+    if (S.undo) out.push(h("div", { class: "snack", role: "status" }, h("span", null, `'${S.undo.c.name || S.undo.c.plate}' 지움`), h("button", { onclick: undoRemove }, "되돌리기")));
+    app.replaceChildren(...out);
+    if (S.route === "find") { const q = document.getElementById("q"); if (q && document.activeElement === document.body) q.focus({ preventScroll: true }); }
+    if (S.route !== "add" && S.route !== "backup") S.flash = "";
+  }
+
+  load();
+  publishSummary();
+  Object.assign(S, parseHash());
+  render();
+})();
+</script>
+</body>
+</html>
