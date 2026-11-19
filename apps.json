@@ -58,6 +58,15 @@
       "icon": "car",
       "status": "live",
       "addedAt": "2026-11-17"
+    },
+    {
+      "id": "memo",
+      "name": "메모장",
+      "description": "자주 찾아보는 내용을 적어 두고 몇 글자만 쳐서 바로 꺼내 봅니다. 분류, 고정, 체크 상자, 자동 저장.",
+      "path": "apps/memo/",
+      "icon": "note",
+      "status": "live",
+      "addedAt": "2026-11-19"
     }
   ]
 }

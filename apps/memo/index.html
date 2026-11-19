@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>메모장</title>
+<meta name="description" content="언제든 꺼내 보는 참고 메모. 이 기기 안에만 저장합니다.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10191b" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 3h13l6 6v20H7z' fill='none' stroke='%230d6b66' stroke-width='2.5' stroke-linejoin='round'/%3E%3Cpath d='M11 15h10M11 20h10M11 25h6' stroke='%230d6b66' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 공부방과 같은 모눈종이 바탕. 목록은 검색창 + 분류 칩 + 메모 카드, 메모를 누르면 크게 읽는 화면,
+   ✎를 누르면 쓰는 화면(치는 대로 자동 저장). 메모는 이 브라우저의 localStorage('memo-' 키)에만 둔다. */
+:root {
+  color-scheme: light dark;
+  --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
+  --accent: #0d6b66; --accent-ink: #ffffff; --mark: #ffe45c; --mark-fg: #16282b;
+  --good: #17693f; --good-bg: #e2f4e9; --bad: #a93127; --bad-bg: #fbe9e6;
+  --display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #10191b; --grid: #162225; --fg: #e6eeec; --muted: #9db0ae; --surface: #18262a; --line: #2f4346;
+  --accent: #4fc4ba; --accent-ink: #08201f; --mark: #5c5000; --mark-fg: #fff4b0;
+  --good: #6ad698; --good-bg: #12301f; --bad: #ff9c8f; --bad-bg: #3a1a16;
+} }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background-color: var(--bg); color: var(--fg); font: 400 16px/1.6 var(--body); word-break: keep-all; overflow-wrap: anywhere;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#app { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 14px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.25; margin: 0; }
+h1 { font-size: 1.85rem; } h2 { font-size: 1.3rem; } h3 { font-size: 1.1rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+.muted { color: var(--muted); } .small { font-size: .88rem; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.head { display: flex; flex-direction: column; gap: 2px; }
+.back { display: inline-flex; align-items: center; min-height: 44px; align-self: flex-start; margin: -6px 0 -6px -8px; padding: 0 12px 0 8px; border-radius: 6px; color: var(--accent); text-decoration: none; font-weight: 500; font-size: .92rem; background: none; border: 0; font-family: inherit; cursor: pointer; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; position: sticky; top: 6px; z-index: 3; padding: 4px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; }
+.tabs button { min-height: 40px; border-radius: 7px; border: 0; background: transparent; color: var(--muted); font: 400 1.05rem var(--display); cursor: pointer; }
+.tabs button[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.card { padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
+input, textarea { width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; min-height: 44px; }
+textarea { min-height: 72px; resize: vertical; }
+input:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+label { font-size: .88rem; color: var(--muted); }
+.search { font-size: 1.35rem; min-height: 56px; padding: 10px 14px; border-width: 2px; border-color: var(--accent); background: var(--surface); }
+.btn { min-height: 44px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font: 700 .95rem var(--body); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+.btn[disabled] { cursor: default; background: transparent; color: var(--muted); border-color: var(--line); border-style: dashed; }
+.note { padding: 10px 14px; border-radius: 6px; border: 1.5px solid var(--line); font-size: .9rem; }
+.note.good { background: var(--good-bg); color: var(--good); border-color: var(--good); }
+.note.bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+.icon-btn { min-width: 44px; min-height: 44px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); color: var(--accent); font: 700 1rem var(--body); cursor: pointer; }
+.count { font: 500 .85rem var(--mono); color: var(--muted); }
+.snack { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 9; display: flex; gap: 12px; align-items: center;
+  max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border-radius: 8px; background: var(--fg); color: var(--bg); box-shadow: 0 4px 16px rgba(0, 0, 0, .28); font-size: .92rem; }
+.snack span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snack button { flex: none; min-height: 40px; padding: 4px 14px; border-radius: 6px; border: 1.5px solid var(--bg); background: transparent; color: var(--bg); font: 700 .92rem var(--body); cursor: pointer; }
+mark { background: var(--mark); color: var(--mark-fg); border-radius: 2px; padding: 0 1px; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chip { flex: none; min-height: 36px; padding: 4px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg); font: 500 .9rem var(--body); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.item { display: flex; gap: 8px; align-items: flex-start; padding: 12px 8px 12px 14px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; }
+.item.pinned { border-left: 5px solid var(--accent); }
+.item .open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; background: none; border: 0; padding: 0; text-align: left; color: var(--fg); font: inherit; cursor: pointer; }
+.item .ttl { font: 400 1.15rem/1.3 var(--display); }
+.item .pre { font-size: .9rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+.item .when { font: 500 .78rem var(--mono); color: var(--muted); }
+.tag { display: inline-block; font-size: .78rem; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-right: 4px; }
+.reader { padding: 18px 18px 20px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; gap: 12px; }
+.reader h2 { font-size: 1.6rem; }
+.reader .text { font-size: 1.12rem; line-height: 1.75; white-space: pre-wrap; }
+.reader .text .ck { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.reader .text .ck input { width: 22px; min-height: 22px; margin-top: 4px; flex: none; }
+.reader .text .ck.done span { text-decoration: line-through; color: var(--muted); }
+.big .reader .text { font-size: 1.35rem; }
+.editor textarea#body { min-height: 55vh; font-size: 1.05rem; line-height: 1.7; }
+.editor #title { font: 400 1.3rem var(--display); }
+.saved { font: 500 .8rem var(--mono); color: var(--muted); }
+.fab { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 5; min-height: 56px; padding: 0 22px; border-radius: 999px; border: 0; background: var(--accent); color: var(--accent-ink); font: 700 1rem var(--body); box-shadow: 0 4px 14px rgba(0, 0, 0, .25); cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+  /* 이 앱은 'memo-'로 시작하는 키와 공부방 첫 화면용 요약 키만 쓴다. */
+  const KEY = "memo-data-v1";
+  const app = document.getElementById("app");
+  const S = { route: "list", id: null, q: "", tag: "", msg: "", flash: "", undo: null, big: false };
+  let DB = { version: 1, notes: [] };
+
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "value") el.value = v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat(Infinity)) if (c !== null && c !== undefined && c !== false) el.append(c);
+    return el;
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const now = () => new Date().toISOString();
+  const norm = s => String(s || "").toLowerCase().replace(/\s+/g, "");
+  const tagsOf = s => [...new Set(String(s || "").split(/[,#]/).map(t => t.trim()).filter(Boolean))];
+  /* 제목을 비워 두면 본문 첫 줄을 제목처럼 보여 준다. */
+  const titleOf = n => n.title.trim() || n.body.trim().split("\n")[0].replace(/^- \[[ xX]\] /, "").slice(0, 40) || "(빈 메모)";
+  function when(iso) {
+    const d = new Date(iso), t = new Date();
+    if (d.toDateString() === t.toDateString()) return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+    return d.getFullYear() === t.getFullYear() ? `${d.getMonth() + 1}월 ${d.getDate()}일` : d.toISOString().slice(0, 10);
+  }
+  function hl(text, q) {
+    const t = String(text || ""), k = String(q || "").trim();
+    if (!k) return t;
+    const i = t.toLowerCase().indexOf(k.toLowerCase());
+    return i < 0 ? t : [t.slice(0, i), h("mark", null, t.slice(i, i + k.length)), t.slice(i + k.length)];
+  }
+
+  function load() {
+    try { const d = JSON.parse(localStorage.getItem(KEY) || "null"); if (d && Array.isArray(d.notes)) DB = d; } catch { /* 비어 있으면 새로 시작 */ }
+    try { S.big = localStorage.getItem("memo-big") === "1"; } catch { /* 글자 크기는 기본값 */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); S.msg = ""; publishSummary(); return true; }
+    catch { S.msg = "이 브라우저에 저장하지 못했습니다. 시크릿 모드라면 일반 창에서 열어 주세요."; return false; }
+  }
+  /* 공부방 첫 화면에는 메모 개수만 넘긴다. 내용은 넘기지 않는다. */
+  function publishSummary() {
+    try { localStorage.setItem("platform-summary:memo", JSON.stringify({ text: DB.notes.length ? `메모 ${DB.notes.length}개` : "아직 메모가 없습니다", at: now() })); } catch { /* 요약은 없어도 된다 */ }
+  }
+
+  /* ---------- 라우팅: #list, #n-<id>(읽기), #e-<id>(쓰기), #new, #backup ---------- */
+  function parseHash() {
+    const r = location.hash.slice(1);
+    if (r.startsWith("n-")) return { route: "read", id: r.slice(2) };
+    if (r.startsWith("e-")) return { route: "edit", id: r.slice(2) };
+    if (r === "new" || r === "backup") return { route: r, id: null };
+    return { route: "list", id: null };
+  }
+  function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else render(); }
+  /* 새 메모는 주소를 #e-<id>로 바꿔 두므로, 늦게 도착한 hashchange가 같은 화면을 가리키면 무시한다. */
+  window.addEventListener("hashchange", () => {
+    const next = parseHash();
+    if (next.route === S.route && next.id === S.id) return;
+    leaveEditor(); Object.assign(S, next); render(); window.scrollTo(0, 0);
+  });
+  const find = id => DB.notes.find(n => n.id === id);
+
+  function header(title, sub) {
+    const tabs = [["list", "메모"], ["new", "새 메모"], ["backup", "백업"]];
+    const cur = S.route === "read" ? "list" : S.route === "edit" ? (S.isNew ? "new" : "list") : S.route;
+    return [
+      h("header", { class: "head" }, h("a", { class: "back", href: "../../" }, "← 공부방"), title ? h("h1", null, title) : null, sub ? h("p", { class: "muted small" }, sub) : null),
+      h("nav", { class: "tabs", "aria-label": "메모장 메뉴" }, tabs.map(([r, l]) =>
+        h("button", { "aria-current": cur === r ? "page" : null, onclick: () => go(r) }, l))),
+      S.msg ? h("div", { class: "note bad", role: "alert" }, S.msg) : null];
+  }
+
+  /* ---------- 목록 ---------- */
+  function sorted(list) { return list.slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || String(b.updatedAt).localeCompare(String(a.updatedAt))); }
+  function matches(n) {
+    if (S.tag && !tagsOf(n.tags).includes(S.tag)) return false;
+    const q = norm(S.q); if (!q) return true;
+    return norm(n.title + " " + n.body + " " + n.tags).includes(q);
+  }
+  /* 찾는 말이 본문에 있으면 그 부분 앞뒤를 미리보기로 보여 준다. */
+  function preview(n) {
+    const body = n.body.trim(), q = S.q.trim();
+    if (q) { const i = body.toLowerCase().indexOf(q.toLowerCase()); if (i > 30) return "…" + body.slice(i - 20, i + 120); }
+    return body.slice(0, 160);
+  }
+  const tidy = s => s.replace(/^(\s*)- \[[xX]\] /gm, "$1☑ ").replace(/^(\s*)- \[ \] /gm, "$1☐ ");
+  function itemEl(n) {
+    const q = S.q.trim();
+    return h("article", { class: "item" + (n.pin ? " pinned" : "") },
+      h("button", { class: "open", onclick: () => go("n-" + n.id) },
+        h("span", { class: "ttl" }, hl(titleOf(n), q)),
+        n.body.trim() ? h("span", { class: "pre" }, hl(tidy(preview(n)), q)) : null,
+        h("span", { class: "when" }, tagsOf(n.tags).map(t => h("span", { class: "tag" }, t)), when(n.updatedAt))),
+      h("button", { class: "icon-btn", style: n.pin ? "color:var(--accent);border-color:var(--accent)" : null, "aria-pressed": String(!!n.pin), "aria-label": n.pin ? "고정 풀기" : "맨 위에 고정", title: "맨 위에 고정",
+        onclick: () => { n.pin = !n.pin; save(); refill(); } }, n.pin ? "📌" : "☆"));
+  }
+  function results() {
+    const list = sorted(DB.notes.filter(matches));
+    const filtered = S.q.trim() || S.tag;
+    return [
+      h("p", { class: "count", role: "status" }, filtered ? `${list.length}개 찾음` : `전체 ${DB.notes.length}개`),
+      list.length ? list.map(itemEl) : h("div", { class: "note" }, `'${S.q.trim() || S.tag}'와 맞는 메모가 없습니다.`)];
+  }
+  /* 글자를 칠 때마다 화면 전체를 다시 그리면 한글 조합이 끊기므로 결과 칸만 바꾼다. */
+  function refill() { const box = document.getElementById("results"); if (box) box.replaceChildren(...[results()].flat(Infinity).filter(Boolean)); }
+  function viewList() {
+    const fab = h("button", { class: "fab", onclick: () => go("new") }, "+ 새 메모");
+    if (!DB.notes.length) return [header("메모장", "언제든 꺼내 보는 참고 메모. 적은 내용은 이 기기 브라우저에만 저장됩니다."),
+      h("div", { class: "card" }, h("h3", null, "첫 메모를 적어 보세요"),
+        h("p", { class: "small" }, "자주 찾아보는 정보(업무 절차, 연락 순서, 회의 요점, 체크리스트 등)를 적어 두면 검색창에서 몇 글자만 쳐도 바로 꺼내 볼 수 있습니다."),
+        h("p", { class: "small muted" }, "줄 앞에 '- [ ] '를 쓰면 읽는 화면에서 체크 상자가 됩니다. 분류를 붙이면 위쪽 칩으로 골라 볼 수 있습니다."),
+        h("button", { class: "btn", onclick: () => go("new") }, "새 메모 쓰기"))];
+    const tags = [...new Set(DB.notes.flatMap(n => tagsOf(n.tags)))].sort((a, b) => a.localeCompare(b, "ko"));
+    if (S.tag && !tags.includes(S.tag)) S.tag = "";
+    return [header("메모장"),
+      h("input", { id: "q", class: "search", type: "search", inputmode: "search", autocomplete: "off", enterkeyhint: "search", "aria-label": "메모 찾기",
+        placeholder: "제목·내용·분류로 찾기", value: S.q, oninput: e => { S.q = e.target.value; refill(); } }),
+      tags.length ? h("div", { class: "chips", role: "group", "aria-label": "분류" },
+        [["", "전체"], ...tags.map(t => [t, t])].map(([v, l]) => h("button", { class: "chip", "aria-pressed": String(S.tag === v), onclick: () => { S.tag = v; render(); } }, l))) : null,
+      h("div", { class: "stack", id: "results" }, results()),
+      h("div", { style: "height:64px" }), fab];
+  }
+
+  /* ---------- 읽기 ---------- */
+  /* URL은 눌러 열 수 있게, '- [ ] ' 줄은 체크 상자로 보여 준다. */
+  function linkify(line) {
+    const out = []; let last = 0;
+    for (const m of line.matchAll(/https?:\/\/[^\s<>"']+/g)) {
+      out.push(line.slice(last, m.index), h("a", { href: m[0], target: "_blank", rel: "noopener noreferrer" }, m[0])); last = m.index + m[0].length;
+    }
+    out.push(line.slice(last)); return out;
+  }
+  function bodyEl(n) {
+    const lines = n.body.split("\n");
+    return h("div", { class: "text" }, lines.map((line, i) => {
+      const m = /^(\s*)- \[([ xX])\] (.*)$/.exec(line);
+      if (!m) return [linkify(line), i < lines.length - 1 ? "\n" : null];
+      const done = m[2] !== " ";
+      return h("label", { class: "ck" + (done ? " done" : "") },
+        h("input", { type: "checkbox", checked: done ? true : null, onchange: e => {
+          lines[i] = `${m[1]}- [${e.target.checked ? "x" : " "}] ${m[3]}`; n.body = lines.join("\n"); save(); render();
+        } }), h("span", null, linkify(m[3])));
+    }));
+  }
+  function viewRead() {
+    const n = find(S.id);
+    if (!n) return [header("메모"), h("p", { class: "muted" }, "이 메모를 찾을 수 없습니다.")];
+    const copy = async () => {
+      try { await navigator.clipboard.writeText(n.body); S.flash = "내용을 복사했습니다."; } catch { S.flash = "복사하지 못했습니다. 길게 눌러 직접 복사해 주세요."; }
+      render();
+    };
+    return [header(null),
+      S.flash ? h("div", { class: "note good", role: "status" }, S.flash) : null,
+      h("div", { class: S.big ? "big" : "" }, h("article", { class: "reader" },
+        h("h2", null, titleOf(n)),
+        tagsOf(n.tags).length ? h("div", null, tagsOf(n.tags).map(t => h("span", { class: "tag" }, t))) : null,
+        n.body.trim() ? bodyEl(n) : h("p", { class: "muted" }, "내용이 없습니다."),
+        h("p", { class: "saved" }, `고친 때 ${when(n.updatedAt)}`))),
+      h("div", { class: "row" },
+        h("button", { class: "btn", onclick: () => go("e-" + n.id) }, "✎ 고치기"),
+        h("button", { class: "btn ghost", onclick: copy }, "복사"),
+        h("button", { class: "btn ghost", "aria-pressed": String(S.big), onclick: () => { S.big = !S.big; try { localStorage.setItem("memo-big", S.big ? "1" : "0"); } catch { /* 저장 못 해도 이번엔 적용 */ } render(); } }, S.big ? "글자 보통" : "글자 크게"),
+        h("button", { class: "btn ghost", onclick: () => { n.pin = !n.pin; save(); render(); } }, n.pin ? "고정 풀기" : "맨 위에 고정"),
+        h("button", { class: "btn danger", onclick: () => removeNote(n) }, "지우기"))];
+  }
+
+  /* ---------- 쓰기: 치는 대로 자동 저장 ---------- */
+  let saveTimer;
+  function viewEdit() {
+    let n = find(S.id);
+    if (S.route === "new") {
+      // 새 메모는 화면을 열 때 만들고, 아무것도 안 쓰고 나가면 지운다.
+      n = { id: uid(), title: "", body: "", tags: S.tag || "", pin: false, createdAt: now(), updatedAt: now() };
+      DB.notes.push(n); S.id = n.id; S.isNew = true; S.route = "edit";
+      history.replaceState(null, "", "#e-" + n.id);
+    }
+    if (!n) return [header("고치기"), h("p", { class: "muted" }, "이 메모를 찾을 수 없습니다.")];
+    const status = h("span", { class: "saved", role: "status" }, S.isNew ? "쓰는 대로 저장됩니다" : `저장됨 · ${when(n.updatedAt)}`);
+    const touch = (k, v) => {
+      n[k] = v; n.updatedAt = now(); status.textContent = "저장 중…";
+      clearTimeout(saveTimer); saveTimer = setTimeout(() => { if (save()) status.textContent = "저장됨"; else status.textContent = "저장 실패"; }, 350);
+    };
+    return [header(null),
+      h("div", { class: "card editor" },
+        h("input", { id: "title", value: n.title, placeholder: "제목 (비우면 첫 줄이 제목)", autocomplete: "off", "aria-label": "제목", enterkeyhint: "next", oninput: e => touch("title", e.target.value) }),
+        h("textarea", { id: "body", value: n.body, placeholder: "내용\n\n- [ ] 이렇게 쓰면 체크 상자\nhttps:// 주소는 눌러 열 수 있습니다", "aria-label": "내용", oninput: e => touch("body", e.target.value) }),
+        h("input", { id: "tags", value: n.tags, placeholder: "분류 (예: 업무, 절차) 쉼표로 여러 개", autocomplete: "off", "aria-label": "분류", oninput: e => touch("tags", e.target.value) }),
+        h("div", { class: "bar" }, status,
+          h("div", { class: "row" },
+            h("button", { class: "btn", onclick: () => { flush(); go("n-" + n.id); } }, "다 썼어요"),
+            h("button", { class: "btn danger", onclick: () => removeNote(n) }, "지우기"))))];
+  }
+  function flush() { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; save(); } }
+  /* 쓰기 화면을 떠날 때: 밀린 저장을 마치고, 비어 있는 새 메모는 남기지 않는다. */
+  function leaveEditor() {
+    flush();
+    const n = S.route === "edit" ? find(S.id) : null;
+    if (n && !n.title.trim() && !n.body.trim()) { DB.notes = DB.notes.filter(x => x !== n); save(); }
+    S.isNew = false;
+  }
+
+  /* 한 번 눌러 지우고, 6초 동안 되돌릴 수 있게 한다. */
+  let undoTimer;
+  function removeNote(n) {
+    clearTimeout(saveTimer); saveTimer = null;
+    const index = DB.notes.indexOf(n);
+    DB.notes = DB.notes.filter(x => x !== n); save();
+    S.undo = (n.title.trim() || n.body.trim()) ? { n, index } : null;
+    go("list");
+    clearTimeout(undoTimer); undoTimer = setTimeout(() => { S.undo = null; render(); }, 6000);
+  }
+  function undoRemove() {
+    const u = S.undo; if (!u) return;
+    DB.notes.splice(Math.min(u.index, DB.notes.length), 0, u.n); S.undo = null; clearTimeout(undoTimer); save(); render();
+  }
+
+  /* ---------- 백업 ---------- */
+  function viewBackup() {
+    return [header("백업", "메모는 이 기기 브라우저에만 있습니다. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 백업 파일로 저장하세요."),
+      S.flash ? h("div", { class: "note good", role: "status" }, S.flash) : null,
+      h("div", { class: "card" },
+        h("p", { class: "small" }, `지금 메모 ${DB.notes.length}개. 백업 파일에는 메모 내용이 그대로 들어 있으니 안전한 곳에 두세요.`),
+        h("div", { class: "row" },
+          h("button", { class: "btn ghost", disabled: !DB.notes.length, onclick: () => {
+            const url = URL.createObjectURL(new Blob([JSON.stringify({ app: "memo", ...DB, exportedAt: now() }, null, 1)], { type: "application/json" }));
+            const a = h("a", { href: url, download: `memo-백업-${now().slice(0, 10)}.json` }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+          } }, "백업 파일 저장"),
+          h("label", { class: "btn ghost", for: "restore", style: "color:var(--accent)" }, "백업 불러오기"),
+          h("input", { id: "restore", type: "file", accept: ".json,application/json", hidden: true, onchange: async e => {
+            try {
+              const d = JSON.parse(await e.target.files[0].text());
+              if (d.app !== "memo" || !Array.isArray(d.notes)) throw 0;
+              if (DB.notes.length && !confirm("지금 메모를 백업 파일 내용으로 바꿀까요?")) return;
+              DB = { version: 1, notes: d.notes }; save(); S.msg = ""; S.flash = `백업에서 메모 ${d.notes.length}개를 불러왔습니다.`; render();
+            } catch { S.flash = ""; S.msg = "메모장 백업 파일이 아닙니다."; render(); }
+          } })),
+        h("div", { class: "bar", style: "border-top:1px solid var(--line);padding-top:10px" }, h("span", { class: "small muted" }, "처음부터 다시 하려면"),
+          h("button", { class: "btn danger", disabled: !DB.notes.length, onclick: () => {
+            if (!confirm("메모를 모두 지울까요? 되돌릴 수 없습니다.")) return;
+            DB = { version: 1, notes: [] }; try { localStorage.removeItem(KEY); } catch { /* 없으면 그만 */ } publishSummary(); S.flash = "모두 지웠습니다."; render();
+          } }, "모두 지우기")))];
+  }
+
+  function render() {
+    const view = S.route === "new" || S.route === "edit" ? viewEdit() : S.route === "read" ? viewRead() : S.route === "backup" ? viewBackup() : viewList();
+    const out = [view].flat(Infinity).filter(Boolean);
+    if (S.undo) out.push(h("div", { class: "snack", role: "status" }, h("span", null, `'${titleOf(S.undo.n)}' 지움`), h("button", { onclick: undoRemove }, "되돌리기")));
+    app.replaceChildren(...out);
+    if (S.route === "edit" && S.isNew) document.getElementById("body")?.focus();
+    if (S.route !== "backup") S.flash = "";
+  }
+  window.addEventListener("pagehide", flush);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) flush(); });
+
+  load();
+  publishSummary();
+  Object.assign(S, parseHash());
+  render();
+})();
+</script>
+</body>
+</html>
