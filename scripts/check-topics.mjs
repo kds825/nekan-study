@@ -29,11 +29,11 @@ for (const id of ids) {
     need(s.title && s.situation, `${at}: title 또는 situation 없음`);
     need(s.theory?.length, `${at}: 이론 없음`);
     for (const b of s.theory ?? []) need(blocks.includes(b.t), `${at}: 알 수 없는 이론 블록 ${b.t}`);
-    need((s.quiz?.length ?? 0) >= 30, `${at}: 문제가 30개보다 적음 (${s.quiz?.length ?? 0}개)`);
-    for (const l of [1, 3]) need((s.quiz ?? []).some(q => q.level === l), `${at}: level ${l} 문제가 없음`);
+    // 시나리오(챕터)는 짧게 여러 개로 둔다. 칸(종합문제·실습·응용)은 필요한 것만 둔다.
+    need((s.quiz?.length ?? 0) >= 10, `${at}: 문제가 10개보다 적음 (${s.quiz?.length ?? 0}개)`);
+    need(s.from === undefined || t.scenarios.some(x => x.id === s.from && x !== s), `${at}: from은 같은 토픽의 다른 시나리오 id여야 함`);
     const questions = (s.quiz ?? []).map(q => q.q);
     need(new Set(questions).size === questions.length, `${at}: 질문이 중복됨`);
-    need(s.practice?.length, `${at}: 실습 없음`);
     const itemIds = new Set();
     for (const q of s.quiz ?? []) {
       need(q.id && !itemIds.has(q.id), `${at}: 문제 id 오류 또는 중복 ${q.id}`);
@@ -55,7 +55,7 @@ for (const id of ids) {
       else if (p.type === "order") need(p.items?.length > 1, `${at}/${p.id}: items 부족`);
       else errors.push(`${at}/${p.id}: 알 수 없는 실습 유형 ${p.type}`);
     }
-    need(s.apply?.prompt && s.apply?.model && s.apply?.rubric?.length, `${at}: 응용 과제, 모범 답안, 채점 기준 중 빠진 것이 있음`);
+    if (s.apply !== undefined) need(s.apply?.prompt && s.apply?.model && s.apply?.rubric?.length, `${at}: 응용 과제, 모범 답안, 채점 기준 중 빠진 것이 있음`);
   }
 }
 

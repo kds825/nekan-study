@@ -7,7 +7,7 @@
     {
       "id": "nekan",
       "name": "네칸 공부",
-      "description": "짧은 이론과 바로 푸는 문제로 익히고, 종합문제·실습·응용으로 네 칸을 채웁니다.",
+      "description": "짧은 챕터로 이론을 읽고 바로 문제로 익힙니다. 종합문제·실습·응용은 필요한 챕터에만 있습니다.",
       "path": "apps/nekan/",
       "icon": "cells",
       "status": "live",

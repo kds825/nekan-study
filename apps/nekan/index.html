@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
 <style>
-/* Layout: 모눈종이 위 한 줄 단. 시나리오마다 학습(이론 사이사이 문제)과 종합(문제·실습·응용) 두 화면을 오가고, 진행은 네 칸으로 표시한다. 폰에서는 엄지 닿는 하단 레일로 이동한다. */
+/* Layout: 모눈종이 위 한 줄 단. 시나리오마다 학습(이론 사이사이 문제)과 종합(문제·실습·응용) 두 화면을 오가고, 진행은 시나리오에 있는 칸만큼 표시한다. 폰에서는 엄지 닿는 하단 레일로 이동한다. */
 :root {
   color-scheme: light dark;
   --bg: #f3f6f4; --grid: #e6ece9; --fg: #16282b; --muted: #55686b; --surface: #ffffff; --line: #cdd8d4;
@@ -162,7 +162,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 
 <script>
 (() => {
-  /* 진행 칸은 네 개(학습, 종합문제, 실습, 응용)이고, 화면은 학습과 종합 두 개다. */
+  /* 진행 칸은 시나리오에 있는 것만 둔다(학습은 늘, 종합문제·실습·응용은 내용이 있을 때만). 화면은 학습과 종합 두 개다. */
   const STAGES = [["theory", "학습"], ["quiz", "종합문제"], ["practice", "실습"], ["apply", "응용"]];
   const TABS = [["learn", "학습"], ["final", "종합"]];
   const tabOf = x => x === "theory" || x === "learn" ? "learn" : "final";
@@ -220,7 +220,9 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     p.practice.items ||= {}; p.practice.missed ||= []; p.practice.reviewed ||= {};
     return p;
   }
-  const cellsOf = p => STAGES.map(([s]) => !!p?.[s]?.done);
+  const stagesOf = s => STAGES.map(([k]) => k).filter(k => k === "theory" || (k === "quiz" ? finalOf(s).length > 0 : k === "practice" ? (s.practice || []).length > 0 : !!s.apply));
+  const cellsOf = (p, s) => stagesOf(s).map(k => !!p?.[k]?.done);
+  const finalDone = (p, s) => stagesOf(s).filter(k => k !== "theory").every(k => !!p?.[k]?.done);
   function save(tid, sid) {
     S.progress[keyOf(tid, sid)].updatedAt = new Date().toISOString();
     const ok = ls.set(STORE_KEY, JSON.stringify(S.progress));
@@ -568,7 +570,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   /* ---------- 홈 ---------- */
   function topicCells(t) {
     let on = 0, all = 0;
-    for (const s of t.scenarios || []) { all += 4; on += cellsOf(S.progress[keyOf(t.id, s.id)]).filter(Boolean).length; }
+    for (const s of t.scenarios || []) { const c = cellsOf(S.progress[keyOf(t.id, s.id)], s); all += c.length; on += c.filter(Boolean).length; }
     return [on, all];
   }
   function cellsEl(flags, big) {
@@ -578,7 +580,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     const platform = h("a", { class: "back", href: "../../" }, "← 공부방");
     const head = h("header", { class: "brand" }, cellsEl([true, true, true, false], true), h("div", null,
       h("h1", null, "네칸 공부"),
-      h("p", { class: "muted small" }, "짧은 이론을 읽고 바로 문제로 익힌 뒤, 종합문제·실습·응용으로 네 칸을 채웁니다.")));
+      h("p", { class: "muted small" }, "짧은 이론을 읽고 바로 문제로 익힌 뒤, 필요한 만큼 종합문제·실습·응용으로 칸을 채웁니다.")));
     const body = [];
     if (S.loadState === "loading") body.push(h("p", { class: "muted" }, "토픽을 불러오는 중입니다."));
     if (S.loadState === "error") body.push(h("div", { class: "note", role: "alert" }, "토픽 목록을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로 고침해 주세요."));
@@ -591,7 +593,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     if (resume) {
       body.push(h("section", { class: "stack" }, h("h2", null, "이어서 하기"),
         h("button", { class: "entry continue", onclick: () => go({ name: "learn", tid: resume.t.id, sid: resume.s.id }) },
-          cellsEl(cellsOf(resume.p)),
+          cellsEl(cellsOf(resume.p, resume.s)),
           h("div", null, h("div", { class: "tag" }, resume.t.title), h("h3", null, resume.s.title)))));
     }
     if (S.topics.length) {
@@ -610,9 +612,9 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   function latestOpen() {
     let best = null;
     for (const p of Object.values(S.progress)) {
-      if (!p.updatedAt || cellsOf(p).every(Boolean)) continue;
+      if (!p.updatedAt) continue;
       const t = findTopic(p.topicId), s = findScenario(t, p.scenarioId);
-      if (s && (!best || p.updatedAt > best.p.updatedAt)) best = { t, s, p };
+      if (s && !cellsOf(p, s).every(Boolean) && (!best || p.updatedAt > best.p.updatedAt)) best = { t, s, p };
     }
     return best;
   }
@@ -626,7 +628,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
         t.subtitle ? h("p", { class: "muted" }, t.subtitle) : null),
       h("div", { class: "stack" }, (t.scenarios || []).map(s =>
         h("button", { class: "entry", onclick: () => go({ name: "learn", tid: t.id, sid: s.id }) },
-          cellsEl(cellsOf(S.progress[keyOf(t.id, s.id)])),
+          cellsEl(cellsOf(S.progress[keyOf(t.id, s.id)], s)),
           h("div", null, h("h3", null, s.title), h("p", { class: "muted small" }, s.situation))))));
   }
 
@@ -645,8 +647,9 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   function viewLearn(t, s) {
     const p = prog(t.id, s.id);
     const stage = S.stage === "final" ? stageFinal(t, s, p) : stageLearn(t, s, p);
-    const tabDone = { learn: p.theory.done, final: p.quiz.done && p.practice.done && p.apply.done };
-    const rail = h("nav", { class: "rail", "aria-label": "학습 단계" }, h("div", null, TABS.map(([k, label]) =>
+    const tabDone = { learn: p.theory.done, final: finalDone(p, s) };
+    const tabs = stagesOf(s).length > 1 ? TABS : TABS.slice(0, 1);
+    const rail = h("nav", { class: "rail", "aria-label": "학습 단계" }, h("div", null, tabs.map(([k, label]) =>
       h("button", { class: tabDone[k] ? "done" : "", "aria-current": S.stage === k ? "step" : null, onclick: () => setStage(k) },
         label, h("small", null, tabDone[k] ? "완료" : "")))));
     return h("div", { class: "stack-l" },
@@ -675,8 +678,11 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
       h("div", { class: "situation" }, h("div", { class: "tag" }, "오늘의 상황"), h("p", null, rich(s.situation))),
       groups.map((blocks, n) => [blocks.map(block), inline.filter(q => q.sec === n).map(q => quizCard(t, s, p, q, "바로 풀기"))]),
       inline.length ? h("div", { class: "meter" }, `바로 풀기 ${answered} / ${inline.length}`) : null,
-      h("button", { class: "btn wide", onclick: () => { p.theory.done = true; save(t.id, s.id); setStage("final"); } },
-        inline.length && answered < inline.length ? "종합으로 넘어가기 (남은 문제는 그대로 둡니다)" : "종합문제 풀기"));
+      stagesOf(s).length > 1
+        ? h("button", { class: "btn wide", onclick: () => { p.theory.done = true; save(t.id, s.id); setStage("final"); } },
+          inline.length && answered < inline.length ? "종합으로 넘어가기 (남은 문제는 그대로 둡니다)" : finalOf(s).length ? "종합문제 풀기" : "실습하러 가기")
+        : [h("button", { class: "btn wide", onclick: () => { p.theory.done = true; save(t.id, s.id); rerender(); } }, p.theory.done ? "학습 완료" : "학습 완료하기"),
+          p.theory.done ? nextButton(t, s) : null]);
   }
   function quizCard(t, s, p, q, label) {
     const chosen = p.quiz.answers[q.id], answered = chosen !== undefined;
@@ -704,7 +710,16 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
         h("div", { class: "meter" }, `종합문제 ${qs.filter(q => p.quiz.answers[q.id] !== undefined).length} / ${qs.length}`),
         moreCard(t, s, p, "quiz")) : null,
       (s.practice || []).length ? h("section", { class: "stack part" }, h("h2", null, "실습"), stagePractice(t, s, p)) : null,
-      s.apply ? h("section", { class: "stack part" }, h("h2", null, "응용"), stageApply(t, s, p)) : null);
+      s.apply ? h("section", { class: "stack part" }, h("h2", null, "응용"), stageApply(t, s, p)) : null,
+      !s.apply && finalDone(p, s) ? nextButton(t, s) : null);
+  }
+  /* 다음 시나리오로, 마지막이면 토픽으로 */
+  function nextButton(t, s) {
+    const list = t.scenarios || [];
+    const next = list[list.findIndex(x => x.id === s.id) + 1];
+    return next
+      ? h("button", { class: "btn wide", onclick: () => go({ name: "learn", tid: t.id, sid: next.id }) }, "다음 시나리오: " + next.title)
+      : h("button", { class: "btn wide", onclick: () => go({ name: "topic", tid: t.id }) }, "토픽으로 돌아가기");
   }
   /* 문제에 딸린 코드. 들여쓰기를 살려 고정폭 글꼴로 보여 준다. */
   const codeBlock = code => code ? h("div", { class: "formula", tabindex: "0" }, code) : null;
@@ -904,6 +919,27 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
     if (!res.ok) throw new Error(path + " " + res.status);
     return res.json();
   }
+  /* 긴 시나리오를 둘로 나눈 경우(뒤쪽 시나리오의 from = 원래 시나리오 id), 옮겨 간 문제의 답·오답 기록을 새 시나리오로 한 번 옮긴다. */
+  function migrateSplit() {
+    let changed = false;
+    for (const t of S.topics) for (const s of t.scenarios || []) {
+      const old = s.from && S.progress[keyOf(t.id, s.from)];
+      if (!old || S.progress[keyOf(t.id, s.id)]) continue;
+      const qids = new Set((s.quiz || []).map(q => q.id)), pids = new Set((s.practice || []).map(x => x.id));
+      const pick = (obj, ids) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => ids.has(k)));
+      const oq = old.quiz || {}, op = old.practice || {};
+      const moved = (oq.wrongEver || []).some(id => qids.has(id)) || Object.keys(pick(oq.answers, qids)).length || Object.keys(op.items || {}).length || old.apply?.done;
+      if (!moved) continue;
+      S.progress[keyOf(t.id, s.id)] = {
+        topicId: t.id, scenarioId: s.id, updatedAt: old.updatedAt, theory: {},
+        quiz: { answers: pick(oq.answers, qids), wrongEver: (oq.wrongEver || []).filter(id => qids.has(id)), wrongChoice: pick(oq.wrongChoice, qids), reviewed: pick(oq.reviewed, qids) },
+        practice: { items: pick(op.items, pids), missed: (op.missed || []).filter(id => pids.has(id)), reviewed: pick(op.reviewed, pids), done: !!op.done },
+        apply: { ...(old.apply || {}) }
+      };
+      changed = true;
+    }
+    if (changed) { ls.set(STORE_KEY, JSON.stringify(S.progress)); publishSummary(); }
+  }
   async function loadTopics() {
     try {
       const ids = await fetchJson("topics/index.json");
@@ -913,6 +949,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
       for (const t of S.topics) for (const s of t.scenarios || []) (s.quiz || []).sort((a, b) => levelOf(a) - levelOf(b));
       S.failedTopics = results.length - S.topics.length;
       S.loadState = "ready";
+      migrateSplit();
     } catch { S.loadState = "error"; }
     enter(parseHash());
   }
